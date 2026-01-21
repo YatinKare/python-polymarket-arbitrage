@@ -135,7 +135,7 @@ From the plan analysis, must handle:
   - Handle missing tickers and missing IV fields with warnings
 
 ### Phase 4: Volatility & IV Logic
-- [ ] 4.1: Implement IV extraction (polyarb/vol/iv_extract.py)
+- [x] 4.1: Implement IV extraction (polyarb/vol/iv_extract.py)
   - extract_strike_region_iv(chain, strike_level, window_pct) -> float
   - Find strikes around barrier/level (e.g., ±5% moneyness)
   - Interpolate IV at exact strike using log-moneyness
@@ -373,6 +373,64 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
+- Task 4.1: Implement IV extraction (polyarb/vol/iv_extract.py)
+  - Created IV extraction module for extracting implied volatility from option chains
+    - Implements extract_strike_region_iv(chain_df, strike_level, window_pct) -> float
+      - Filters strikes within moneyness window (default ±5%)
+      - Drops strikes with missing IV values
+      - Interpolates IV at exact strike using log-moneyness interpolation
+      - Auto-expands window to ±20% if initial window too narrow
+      - Falls back to nearest strike if only one available
+      - Handles edge cases: target below/above all strikes (uses nearest)
+      - Validates inputs: positive strike, valid window percentage
+      - Warns on data quality issues: sparse strikes, high IV (>500%)
+    - Implements compute_sensitivity_ivs(base_iv) -> dict
+      - Generates sensitivity set: base, ±2%, ±3%
+      - Clips minimum IV at 0.01 (1%) to avoid negative values
+      - Returns dict with keys: 'base', 'minus_3', 'minus_2', 'plus_2', 'plus_3'
+    - Implements get_average_iv_from_region(chain_df, strike_level, window_pct) -> Optional[float]
+      - Fallback method: simple average IV in strike region
+      - Returns None if insufficient data or invalid results
+    - Custom exception: IVExtractionError for clear error handling
+    - Robust handling of edge cases:
+      - Empty chains, missing columns
+      - No strikes in window (auto-expand)
+      - Single strike available (use directly)
+      - Missing IV data (drop and warn)
+      - Target outside strike range (nearest neighbor)
+      - Very high/low IVs (validate and warn)
+  - Created comprehensive test suite (tests/test_iv_extract.py)
+    - 32 test cases covering all functions and edge cases
+    - Test extract_strike_region_iv: 18 tests
+      - Exact match, interpolation between strikes
+      - Various window sizes (narrow, default, wide)
+      - Missing IVs, single strike, sparse data
+      - Below/above all strikes (boundary cases)
+      - Auto-expansion of window when too narrow
+      - Error cases: empty chain, missing columns, invalid inputs
+      - Warning cases: high IV, limited strikes
+      - Log-moneyness interpolation correctness (U-shaped smile)
+    - Test compute_sensitivity_ivs: 6 tests
+      - Basic sensitivity computation
+      - Low IV clipping (minimum 0.01)
+      - High IV values
+      - Error cases: zero/negative IV
+      - All expected keys present
+    - Test get_average_iv_from_region: 8 tests
+      - Average calculation in region
+      - Missing IVs excluded from average
+      - Empty chain, no strikes in window
+      - Single strike, all missing IVs
+      - Negative/zero IV handling
+    - All 32 tests passing
+  - Full test suite status: 102 tests passing (70 existing + 32 new)
+    - 10 Gamma client tests
+    - 15 CLOB client tests
+    - 19 FRED client tests
+    - 26 yfinance client tests
+    - 32 IV extraction tests
+
+Previous iterations:
 - Task 3.4: Implement yfinance wrapper (polyarb/clients/yfinance_md.py)
   - Created YFMarketData class for market data fetching via yfinance
     - Provides spot prices, option chains, and implied volatility data
