@@ -115,7 +115,7 @@ From the plan analysis, must handle:
   - search_markets(query, limit) -> list[Market]
   - Handle API errors gracefully
 
-- [ ] 3.2: Implement Polymarket CLOB client (polyarb/clients/polymarket_clob.py)
+- [x] 3.2: Implement Polymarket CLOB client (polyarb/clients/polymarket_clob.py)
   - ClobClient class with httpx client
   - get_price(token_id, side) -> TokenPrice
   - get_book(token_id) -> order book data (for phase 2)
@@ -373,18 +373,29 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
-- Task 3.1: Implement Polymarket Gamma client (polyarb/clients/polymarket_gamma.py)
-  - Created GammaClient class for Polymarket Gamma API integration
-    - Base URL: https://gamma-api.polymarket.com
-    - Implements get_market(market_id) -> Market: Fetch market details by ID
-    - Implements search_markets(query, limit, offset, closed, archived) -> list[Market]: Search markets
-    - Robust error handling with custom GammaClientError exception
-    - Graceful parsing of various API response formats (direct list or data wrapper)
-    - Support for multiple field name variations (id/condition_id/conditionId, endDate/end_date/expirationDate, etc.)
-    - Parse CLOB token IDs in both list and dict formats
-    - Properly maps outcomes to token IDs for Yes/No determination
-  - Created comprehensive test suite (tests/test_gamma_client.py)
-    - 10 test cases covering all client methods
+- Task 3.2: Implement Polymarket CLOB client (polyarb/clients/polymarket_clob.py)
+  - Created ClobClient class for Polymarket CLOB API integration
+    - Base URL: https://clob.polymarket.com
+    - Implements get_price(token_id, side) -> TokenPrice: Fetch best price for a token
+      - Supports BUY/SELL sides for Yes/No token pricing
+      - Handles multiple response field formats (price, mid, best_price)
+      - Validates prices are in [0, 1] range
+    - Implements get_book(token_id) -> OrderBook: Fetch full order book
+      - Parses both list [price, size] and dict {"price": x, "size": y} formats
+      - Automatically sorts bids descending and asks ascending
+      - Computes best_bid, best_ask, and mid_price properties
+      - Handles timestamp parsing (Unix epoch and ISO formats)
+    - Implements get_yes_price(token_id) -> float: Convenience method for Yes price
+      - Tries order book best ask first (most accurate)
+      - Falls back to /price endpoint if book unavailable
+    - Robust error handling with custom ClobClientError exception
+    - Timezone-aware datetime handling (fixed deprecation warnings)
+  - Created comprehensive test suite (tests/test_clob_client.py)
+    - 15 test cases covering all client methods
     - Mock httpx.Client for isolated unit testing
-    - Test edge cases: 404 errors, missing fields, alternate field names, data wrapper formats
-    - All tests passing successfully
+    - Test edge cases: 404 errors, missing fields, invalid ranges, empty books
+    - Test both list and dict response formats
+    - Test unsorted input data handling
+    - Test fallback logic for get_yes_price
+    - All 15 tests passing with no warnings
+  - Full test suite status: 25 tests passing (10 Gamma + 15 CLOB)
