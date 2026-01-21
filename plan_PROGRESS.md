@@ -164,11 +164,12 @@ From the plan analysis, must handle:
   - Test against known limits (driftless, high vol, short T)
   - PV = exp(-rT) * P_hit
 
-- [ ] 5.3: Add verdict logic
+- [x] 5.3: Add verdict logic
   - compute_verdict(poly_price, fair_pv, abs_tol, pct_tol) -> str
   - "Fair" if abs_diff <= abs_tol OR pct_diff <= pct_tol
   - "Cheap" if poly < fair beyond tolerance
   - "Expensive" if poly > fair beyond tolerance
+  - NOTE: Already implemented in task 5.1 (polyarb/pricing/digital_bs.py)
 
 ### Phase 6: Reporting
 - [ ] 6.1: Implement markdown report generator (polyarb/report/markdown_report.py)
@@ -374,6 +375,7 @@ The task order is designed to respect dependencies:
 
 ## Completed This Iteration
 - Task 5.2: Implement touch barrier pricing (polyarb/pricing/touch_barrier.py)
+- Task 5.3: Verified verdict logic already implemented (discovered during task 5.2)
   - Created touch barrier pricing module for barrier hit (touch) events
     - Implements touch_price(S0, B, T, r, q, sigma) -> PricingResult
       - Determines barrier direction automatically (up if B > S0, down if B < S0)
