@@ -141,7 +141,7 @@ From the plan analysis, must handle:
   - Interpolate IV at exact strike using log-moneyness
   - Handle missing IVs (drop or warn)
 
-- [ ] 4.2: Implement term structure interpolation (polyarb/vol/term_structure.py)
+- [x] 4.2: Implement term structure interpolation (polyarb/vol/term_structure.py)
   - find_bracketing_expiries(target_date, available_expiries) -> (before, after)
   - interpolate_variance(iv1, t1, iv2, t2, target_t) -> target_iv
   - Use total variance: w(T) = σ²T, linear interpolation
@@ -373,6 +373,72 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
+- Task 4.2: Implement term structure interpolation (polyarb/vol/term_structure.py)
+  - Created term structure interpolation module for IV across time horizons
+    - Implements find_bracketing_expiries(target_date, available_expiries) -> (before, after)
+      - Finds expiries that bracket the target date
+      - Returns exact match as (target_date, None)
+      - Handles edge cases: before all, after all, empty list, single expiry
+      - Works with unsorted input lists
+    - Implements interpolate_variance(iv1, t1, iv2, t2, target_t) -> float
+      - Linear interpolation of total variance: w(T) = σ²T
+      - Formula: w_target = w1 + (w2 - w1) * (t_target - t1) / (t2 - t1)
+      - Converts back to volatility: σ_target = sqrt(w_target / t_target)
+      - Validates all times and IVs are positive
+      - Ensures t1 < t2 and t1 <= target_t <= t2
+      - Returns interpolated IV at target time
+    - Implements interpolate_iv_term_structure(target_date, expiry_iv_pairs, reference_date) -> float
+      - High-level function combining bracketing and variance interpolation
+      - Handles exact matches (returns exact IV)
+      - Handles target before/after all expiries (uses nearest with warning)
+      - Handles single expiry (uses that expiry with warning)
+      - Performs variance interpolation between two bracketing expiries
+      - Computes time-to-expiry in years (365-day convention)
+      - Validates target is after reference date
+      - Gracefully handles edge cases with warnings
+    - Implements compute_time_to_expiry(expiry_date, reference_date) -> float
+      - Converts date difference to years (days / 365.0)
+      - Uses today as default reference date
+      - Validates expiry is after reference date
+    - Custom exception: TermStructureError for clear error handling
+    - Robust handling of edge cases:
+      - Exact matches, bracketing, extrapolation
+      - Single expiry, empty expiries
+      - Reference date at or after expiries
+      - Non-positive times or IVs
+      - Reversed time ordering
+  - Created comprehensive test suite (tests/test_term_structure.py)
+    - 39 test cases covering all functions and edge cases
+    - Test find_bracketing_expiries: 9 tests
+      - Exact match, between two, before/after all
+      - Empty list, single expiry (before/after/exact)
+      - Unsorted input handling
+    - Test interpolate_variance: 13 tests
+      - Basic interpolation, at endpoints
+      - Increasing and decreasing term structures
+      - Error cases: negative/zero times, negative/zero IVs
+      - Error cases: reversed times, target outside range
+    - Test interpolate_iv_term_structure: 10 tests
+      - Exact match, interpolation between two
+      - Before/after all expiries (with warnings)
+      - Single expiry (with warning)
+      - Empty pairs, negative IV (errors)
+      - Target before reference (with warning)
+      - Default reference date, expiry at reference date
+    - Test compute_time_to_expiry: 7 tests
+      - Basic calculation, one year, one month
+      - Default reference date, very short/long expiry
+      - Error cases: expiry in past or same as reference
+    - All 39 tests passing
+  - Full test suite status: 141 tests passing (102 existing + 39 new)
+    - 10 Gamma client tests
+    - 15 CLOB client tests
+    - 19 FRED client tests
+    - 26 yfinance client tests
+    - 32 IV extraction tests
+    - 39 term structure tests
+
+Previous iterations:
 - Task 4.1: Implement IV extraction (polyarb/vol/iv_extract.py)
   - Created IV extraction module for extracting implied volatility from option chains
     - Implements extract_strike_region_iv(chain_df, strike_level, window_pct) -> float
