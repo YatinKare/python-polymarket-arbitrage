@@ -172,7 +172,7 @@ From the plan analysis, must handle:
   - NOTE: Already implemented in task 5.1 (polyarb/pricing/digital_bs.py)
 
 ### Phase 6: Reporting
-- [ ] 6.1: Implement markdown report generator (polyarb/report/markdown_report.py)
+- [x] 6.1: Implement markdown report generator (polyarb/report/markdown_report.py)
   - render(ctx: ReportContext) -> str
   - Section A: Input summary table (ticker, spot, strike, expiry, rates, vol, etc.)
   - Section B: Model choice explanation (touch vs terminal, why)
@@ -247,10 +247,11 @@ From the plan analysis, must handle:
     - Test term structure interpolation
     - Test edge cases (exact match, single expiry)
 
-- [ ] 8.4: Write report tests
+- [x] 8.4: Write report tests
   - tests/test_report_sections.py
     - Assert all A-G section headers present
     - Check markdown structure validity
+    - NOTE: Completed in task 6.1 (report tests written alongside report module)
 
 - [ ] 8.5: Write client tests with mocks
   - Use pytest-mock to patch httpx.get
@@ -374,6 +375,145 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
+- Task 6.1: Implement markdown report generator (polyarb/report/markdown_report.py)
+- Task 8.4: Write report tests (tests/test_report_sections.py) - completed alongside task 6.1
+  - Created markdown report generator producing comprehensive A-G analysis sections
+    - Implements render(ctx: ReportContext) -> str: Main function to generate complete report
+      - Section A: Input summary table with all parameters
+        - Displays ticker, spot price, event type, strike/barrier, expiry, T, r, q, σ
+        - Shows Polymarket Yes/No prices
+        - Documents data sources for IV and rate
+        - Formatted markdown table with clear labels and units
+      - Section B: Model selection explanation
+        - Names the selected model (Digital Option or Touch Barrier)
+        - Provides rationale for model choice based on event type
+        - Default rationale generated for each event type (touch/above/below)
+        - Explains path-dependence vs terminal-settle distinction
+      - Section C: Mathematical derivation
+        - Full step-by-step derivation with formulas
+        - For digital options:
+          - Risk-neutral drift μ = r - q - 0.5σ²
+          - d₂ calculation with explicit values
+          - Probability N(d₂) or N(-d₂) for above/below
+          - Present value with discounting
+        - For touch barriers:
+          - Risk-neutral drift μ = r - q - 0.5σ²
+          - Log-distance a = ln(B/S₀)
+          - First-passage probability using reflection principle
+          - Two-term formula with drift adjustment
+          - Present value with discounting
+        - Sensitivity analysis table showing IV shifts and resulting prob/PV
+        - All intermediate values shown with actual numbers
+      - Section D: Fair vs Polymarket comparison
+        - Comparison table with model PV, Polymarket price, mispricing (abs and %)
+        - Verdict with emoji indicators (📉 Cheap, ✅ Fair, 📈 Expensive)
+        - Detailed interpretation explaining the verdict
+        - References tolerance thresholds used
+      - Section E: Professional conclusion
+        - One-paragraph technical summary
+        - Mentions model assumptions, IV source, rate
+        - States event probability and fair value
+        - Provides verdict and investment implication
+        - Includes caveats about model limitations
+      - Section F: Layman explanation
+        - No-jargon explanation suitable for non-experts
+        - Explains what the bet is about
+        - States current Polymarket price as implied probability
+        - Explains model fair value and its source
+        - Translates verdict into plain language
+        - Warns about model assumptions and real-world differences
+      - Section G: One-liner takeaway
+        - Single sentence summary with key numbers
+        - States Polymarket price, model PV, implied probability, verdict
+        - Includes emoji for quick visual cue
+      - Helper functions for each section
+        - _render_header: Market title and metadata
+        - _render_section_a_inputs: Input table
+        - _render_section_b_model_choice: Model explanation
+        - _render_section_c_derivation: Full math (separate for digital vs touch)
+        - _render_digital_derivation: Digital option derivation
+        - _render_touch_derivation: Touch barrier derivation
+        - _render_sensitivity_table: Volatility sensitivity table
+        - _render_section_d_comparison: Comparison and verdict
+        - _render_verdict_explanation: Verdict interpretation
+        - _render_section_e_conclusion: Professional conclusion
+        - _render_section_f_layman: Layman explanation
+        - _render_section_g_takeaway: One-liner takeaway
+      - Default text generation
+        - _generate_default_rationale: Model selection rationale by event type
+        - _generate_default_conclusion: Professional conclusion text
+        - _generate_default_layman: Layman explanation text
+        - _generate_default_takeaway: One-liner takeaway text
+      - Custom text support
+        - Allows overriding conclusion_text, layman_text, takeaway in ReportContext
+        - Falls back to generated defaults if custom text not provided
+      - Formatting
+        - Consistent number formatting: prices with $, percentages with %
+        - Large numbers with comma separators
+        - Dates in YYYY-MM-DD format
+        - Proper markdown structure with headers, tables, code blocks
+  - Created comprehensive test suite (tests/test_report_sections.py)
+    - 29 test cases covering all report functions and sections
+    - Test render function: 1 test
+      - Returns non-empty string
+    - Test section presence: 1 test
+      - All A-G section headers present in report
+    - Test Section A: 2 tests
+      - Contains all key input parameters
+      - Data sources documented
+    - Test Section B: 1 test
+      - Model choice explained for digital and touch
+    - Test Section C: 3 tests
+      - Digital above derivation complete
+      - Digital below derivation complete
+      - Touch barrier derivation complete
+    - Test Section D: 3 tests
+      - Comparison table for fair verdict
+      - Comparison table for cheap verdict
+      - Comparison table for expensive verdict
+    - Test Section E: 1 test
+      - Professional conclusion present with technical language
+    - Test Section F: 1 test
+      - Layman explanation present with plain language
+    - Test Section G: 1 test
+      - One-sentence takeaway with key numbers
+    - Test sensitivity table: 2 tests
+      - Sensitivity table included when data available
+      - Graceful handling when sensitivity data missing
+    - Test custom text: 3 tests
+      - Custom conclusion text used if provided
+      - Custom layman text used if provided
+      - Custom takeaway text used if provided
+    - Test event descriptions: 3 tests
+      - Touch event descriptions correct
+      - Above event descriptions correct
+      - Below event descriptions correct
+    - Test markdown structure: 1 test
+      - Valid markdown with proper headers and tables
+    - Test formatting: 2 tests
+      - Numeric formatting with commas
+      - Percentage formatting with decimals
+    - Test data sources: 1 test
+      - Data sources section in Section A
+    - Test all combinations: 2 tests
+      - All event types render without errors
+      - All verdicts render without errors
+    - Test edge cases: 2 tests
+      - Market title in header
+      - Warnings section if present (documented for future)
+    - All 29 tests passing
+  - Full test suite status: 226 tests passing (197 existing + 29 new)
+    - 10 Gamma client tests
+    - 15 CLOB client tests
+    - 19 FRED client tests
+    - 26 yfinance client tests
+    - 32 IV extraction tests
+    - 39 term structure tests
+    - 30 digital pricing tests
+    - 26 touch barrier pricing tests
+    - 29 report generation tests
+
+Previous iterations:
 - Task 5.2: Implement touch barrier pricing (polyarb/pricing/touch_barrier.py)
 - Task 5.3: Verified verdict logic already implemented (discovered during task 5.2)
   - Created touch barrier pricing module for barrier hit (touch) events
