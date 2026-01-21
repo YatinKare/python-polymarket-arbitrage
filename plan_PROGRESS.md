@@ -127,7 +127,7 @@ From the plan analysis, must handle:
   - search_series(query) -> list of series (for rates command)
   - Handle missing FRED_API_KEY gracefully
 
-- [ ] 3.4: Implement yfinance wrapper (polyarb/clients/yfinance_md.py)
+- [x] 3.4: Implement yfinance wrapper (polyarb/clients/yfinance_md.py)
   - YFMarketData class wrapping yfinance
   - get_spot(ticker) -> float (S0)
   - get_option_expiries(ticker) -> list[date]
@@ -373,6 +373,44 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
+- Task 3.4: Implement yfinance wrapper (polyarb/clients/yfinance_md.py)
+  - Created YFMarketData class for market data fetching via yfinance
+    - Provides spot prices, option chains, and implied volatility data
+    - Implements get_spot(ticker) -> float: Fetch current spot price (S0)
+      - Tries multiple price fields in order: currentPrice, regularMarketPrice, previousClose
+      - Falls back to history API if info fields unavailable
+      - Properly handles zero/negative prices (explicit None checks to avoid falsy value issues)
+      - Clear error messages for invalid tickers
+    - Implements get_option_expiries(ticker) -> list[date]: Fetch available option expiries
+      - Returns sorted list of expiration dates
+      - Parses yfinance date strings to Python date objects
+      - Handles invalid date formats with warnings
+      - Clear error for tickers without listed options
+    - Implements get_chain(ticker, expiry) -> (calls_df, puts_df): Fetch option chain
+      - Returns tuple of calls and puts DataFrames with normalized columns
+      - Normalizes impliedVolatility to decimal form (0.25 not 25)
+      - Handles percentage-form IV (>1.0) by converting to decimal
+      - Drops rows with missing IV and warns user
+      - Verifies expiry is available before fetching
+      - Clear error if all IV data is missing
+    - Implements get_dividend_yield(ticker) -> Optional[float]: Fetch dividend yield
+      - Returns annual yield in decimal form (0.02 for 2%)
+      - Tries dividendYield field, then computes from dividendRate/price
+      - Returns None for tickers without dividend data (e.g., crypto)
+      - Non-critical: returns None on errors rather than raising
+    - All methods handle missing data gracefully with clear warnings
+    - Robust error handling with custom YFinanceClientError exception
+  - Created comprehensive test suite (tests/test_yfinance_md.py)
+    - 26 test cases covering all client methods
+    - Mock yfinance.Ticker for isolated unit testing
+    - Test get_spot: 8 tests (various price fields, fallbacks, zero/negative, errors)
+    - Test get_option_expiries: 6 tests (parsing, sorting, invalid formats, no options)
+    - Test get_chain: 7 tests (IV normalization, missing IV, percentage conversion, empty chains)
+    - Test get_dividend_yield: 5 tests (field sources, computation, unavailable data, errors)
+    - Test edge cases: zero prices, invalid tickers, missing IV, percentage conversions
+    - All 26 tests passing
+  - Full test suite status: 70 tests passing (10 Gamma + 15 CLOB + 19 FRED + 26 yfinance)
+
 - Task 3.3: Implement FRED client (polyarb/clients/fred.py)
   - Created FredClient class for FRED (Federal Reserve Economic Data) API integration
     - Base URL: https://api.stlouisfed.org/fred
