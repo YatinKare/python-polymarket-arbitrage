@@ -121,7 +121,7 @@ From the plan analysis, must handle:
   - get_book(token_id) -> order book data (for phase 2)
   - Map "Yes/No" to token IDs correctly
 
-- [ ] 3.3: Implement FRED client (polyarb/clients/fred.py)
+- [x] 3.3: Implement FRED client (polyarb/clients/fred.py)
   - FredClient class with httpx client and API key from env
   - get_series_observations(series_id) -> latest rate value
   - search_series(query) -> list of series (for rates command)
@@ -373,6 +373,36 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
+- Task 3.3: Implement FRED client (polyarb/clients/fred.py)
+  - Created FredClient class for FRED (Federal Reserve Economic Data) API integration
+    - Base URL: https://api.stlouisfed.org/fred
+    - Implements get_latest_observation(series_id) -> (value, date): Fetch latest rate observation
+      - Handles FRED's missing value indicator "." gracefully
+      - Returns both the rate value and the observation date
+      - Validates numeric values and date formats
+    - Implements get_series_info(series_id) -> dict: Fetch series metadata
+      - Returns title, units, frequency, and other metadata
+      - Useful for displaying rate information to users
+    - Implements search_series(query, limit) -> list[dict]: Search for series by keyword
+      - Enables discovery of appropriate rate series
+      - Supports the optional 'rates' command functionality
+    - API key management:
+      - Accepts explicit api_key parameter OR reads from FRED_API_KEY env var
+      - Raises clear error if API key not provided
+      - Key is included in all requests as query parameter
+    - Robust error handling with custom FredClientError exception
+      - Distinguishes between invalid series IDs (400) and other HTTP errors
+      - Handles network errors, missing data, and invalid formats
+    - Configurable timeout (default 30 seconds)
+  - Created comprehensive test suite (tests/test_fred_client.py)
+    - 19 test cases covering all client methods
+    - Mock httpx.Client for isolated unit testing
+    - Test edge cases: missing API key, invalid series IDs, missing values (".")
+    - Test error handling: HTTP 400/404/500, network errors, malformed data
+    - Test environment variable loading
+    - All 19 tests passing
+  - Full test suite status: 44 tests passing (10 Gamma + 15 CLOB + 19 FRED)
+
 - Task 3.2: Implement Polymarket CLOB client (polyarb/clients/polymarket_clob.py)
   - Created ClobClient class for Polymarket CLOB API integration
     - Base URL: https://clob.polymarket.com
