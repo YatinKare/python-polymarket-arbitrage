@@ -148,7 +148,7 @@ From the plan analysis, must handle:
   - Handle edge cases (exact match, only one expiry available)
 
 ### Phase 5: Pricing Engines
-- [ ] 5.1: Implement digital option pricing (polyarb/pricing/digital_bs.py)
+- [x] 5.1: Implement digital option pricing (polyarb/pricing/digital_bs.py)
   - digital_price(S0, K, T, r, q, sigma, direction) -> (probability, pv)
   - direction: 'above' or 'below'
   - Compute d2 = (ln(S0/K) + (r - q - 0.5σ²)T) / (σ√T)
@@ -373,6 +373,65 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
+- Task 5.1: Implement digital option pricing (polyarb/pricing/digital_bs.py)
+  - Created digital option pricing module for terminal settle-at-expiry events
+    - Implements digital_price(S0, K, T, r, q, sigma, direction) -> PricingResult
+      - Supports both "above" and "below" directions
+      - Uses Black-Scholes framework with risk-neutral drift μ = r - q - 0.5σ²
+      - Computes d2 = (ln(S0/K) + (r - q - 0.5σ²)T) / (σ√T)
+      - P(above) = N(d2), P(below) = N(-d2) using standard normal CDF
+      - PV = exp(-rT) * P(event) for proper discounting
+      - Returns PricingResult with probability, pv, d2, and drift
+      - Validates all inputs: S0, K, T, sigma > 0; direction in {above, below}
+      - Clamps probability to [0, 1] to handle numerical edge cases
+    - Implements digital_price_with_sensitivity(...)  -> PricingResult
+      - Computes base price plus sensitivity to volatility shifts
+      - Default shifts: [-0.03, -0.02, 0.02, 0.03] (customizable)
+      - Clamps shifted sigma to minimum 0.01 (1%) to avoid negative values
+      - Returns sensitivity dict: {"sigma-0.02": (prob, pv), "sigma+0.02": (prob, pv), ...}
+      - Useful for understanding pricing sensitivity to IV uncertainty
+    - Implements compute_verdict(poly_price, fair_pv, abs_tol, pct_tol) -> str
+      - Determines if Polymarket price is "Fair", "Cheap", or "Expensive"
+      - Fair if |poly - fair| <= abs_tol OR |poly - fair| / fair <= pct_tol
+      - Cheap if poly < fair beyond tolerance
+      - Expensive if poly > fair beyond tolerance
+      - Handles zero fair value gracefully (uses absolute tolerance only)
+    - Custom exception: DigitalPricingError for clear error handling
+    - Robust input validation and error messages
+  - Created comprehensive test suite (tests/test_pricing_digital.py)
+    - 30 test cases covering all functions and edge cases
+    - Test digital_price: 17 tests
+      - ATM options (above/below) with known probabilities
+      - Deep ITM/OTM scenarios (S0 >> K, S0 << K)
+      - Symmetry test: P(above) + P(below) = 1
+      - Limit cases: zero volatility, zero time, high volatility
+      - Discounting correctness
+      - Probability bounds [0, 1] for various scenarios
+      - Input validation: negative/zero S0, K, T, sigma; invalid direction
+    - Test digital_price_with_sensitivity: 5 tests
+      - Default and custom sigma shifts
+      - Low base sigma handling (clamping to min 0.01)
+      - Monotonicity for OTM options (higher vol → higher prob)
+      - Base result matches direct call
+    - Test compute_verdict: 8 tests
+      - Fair within absolute tolerance
+      - Fair within percentage tolerance
+      - Cheap and expensive verdicts
+      - Boundary conditions
+      - Zero fair value handling
+      - Custom tolerances
+      - Symmetry
+    - All 30 tests passing
+  - Full test suite status: 171 tests passing (141 existing + 30 new)
+    - 10 Gamma client tests
+    - 15 CLOB client tests
+    - 19 FRED client tests
+    - 26 yfinance client tests
+    - 32 IV extraction tests
+    - 39 term structure tests
+    - 30 digital pricing tests
+
+Previous iterations:
 - Task 4.2: Implement term structure interpolation (polyarb/vol/term_structure.py)
   - Created term structure interpolation module for IV across time horizons
     - Implements find_bracketing_expiries(target_date, available_expiries) -> (before, after)
