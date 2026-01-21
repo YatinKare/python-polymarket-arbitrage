@@ -86,7 +86,7 @@ From the plan analysis, must handle:
   - Run `uv add --dev pytest pytest-mock`
   - Verify pyproject.toml has correct `project.scripts` entrypoint
 
-- [ ] 1.2: Create package directory structure
+- [x] 1.2: Create package directory structure
   - Create polyarb/ directory with __init__.py
   - Create polyarb/util/ with __init__.py, dates.py, math.py, fmt.py
   - Create polyarb/clients/ with __init__.py (client files added in later tasks)
@@ -373,8 +373,12 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
-- Task 1.1: Initialize uv project structure and add dependencies
-  - Added runtime dependencies: click, yfinance, httpx, numpy, scipy
-  - Added dev dependencies: pytest, pytest-mock
-  - Configured project.scripts entrypoint: polyarb = "polyarb.cli:main"
-  - Updated project description in pyproject.toml
+- Task 1.2: Create package directory structure
+  - Created polyarb/ main package directory with __init__.py (version 0.1.0)
+  - Created polyarb/util/ with __init__.py and stub files: dates.py, math.py, fmt.py
+  - Created polyarb/clients/ with __init__.py
+  - Created polyarb/vol/ with __init__.py
+  - Created polyarb/pricing/ with __init__.py
+  - Created polyarb/report/ with __init__.py
+  - Created tests/ directory
+  - Verified package can be imported successfully
