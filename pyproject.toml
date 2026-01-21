@@ -1,7 +1,22 @@
 [project]
 name = "python-polymarket-arbitrage"
 version = "0.1.0"
-description = "Add your description here"
+description = "Polymarket options-implied fair value analysis CLI"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "click>=8.3.1",
+    "httpx>=0.28.1",
+    "numpy>=2.4.1",
+    "scipy>=1.17.0",
+    "yfinance>=1.0",
+]
+
+[project.scripts]
+polyarb = "polyarb.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-mock>=3.15.1",
+]

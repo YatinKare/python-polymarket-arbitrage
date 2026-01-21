@@ -81,7 +81,7 @@ From the plan analysis, must handle:
 ## Task List
 
 ### Phase 1: Foundation & Setup
-- [ ] 1.1: Initialize uv project structure and add dependencies
+- [x] 1.1: Initialize uv project structure and add dependencies
   - Run `uv add click yfinance httpx numpy scipy`
   - Run `uv add --dev pytest pytest-mock`
   - Verify pyproject.toml has correct `project.scripts` entrypoint
@@ -371,3 +371,10 @@ The task order is designed to respect dependencies:
 - JSON output format option
 - Bulk market scanning and arbitrage ranking
 - More sophisticated vol surface modeling
+
+## Completed This Iteration
+- Task 1.1: Initialize uv project structure and add dependencies
+  - Added runtime dependencies: click, yfinance, httpx, numpy, scipy
+  - Added dev dependencies: pytest, pytest-mock
+  - Configured project.scripts entrypoint: polyarb = "polyarb.cli:main"
+  - Updated project description in pyproject.toml
