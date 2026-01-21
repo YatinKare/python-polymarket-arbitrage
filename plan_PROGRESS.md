@@ -109,7 +109,7 @@ From the plan analysis, must handle:
   - polyarb/util/fmt.py: number formatting for tables/reports
 
 ### Phase 3: API Clients
-- [ ] 3.1: Implement Polymarket Gamma client (polyarb/clients/polymarket_gamma.py)
+- [x] 3.1: Implement Polymarket Gamma client (polyarb/clients/polymarket_gamma.py)
   - GammaClient class with httpx client
   - get_market(market_id) -> Market model
   - search_markets(query, limit) -> list[Market]
@@ -373,25 +373,18 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
-- Task 2.2: Implement utility modules
-  - Implemented polyarb/util/dates.py with date parsing and time-to-expiry calculation
-    - parse_date: Parse YYYY-MM-DD date strings
-    - parse_datetime: Parse ISO 8601 datetime strings with UTC timezone handling
-    - validate_future_date: Validate dates are in the future
-    - time_to_expiry_years: Calculate time to expiry using 365-day convention
-    - format_date: Format dates as YYYY-MM-DD strings
-  - Implemented polyarb/util/math.py with mathematical helper functions
-    - safe_log: Natural logarithm with protection against invalid inputs
-    - safe_exp: Exponential with overflow protection
-    - clamp: Clamp values within min/max range
-    - is_close: Floating-point comparison with tolerance
-    - sqrt: Square root with validation
-  - Implemented polyarb/util/fmt.py with number formatting utilities
-    - format_percent: Format decimals as percentages
-    - format_price: Format price values (for Polymarket [0,1] range)
-    - format_dollar: Format dollar amounts with commas
-    - format_number: General number formatting with optional scientific notation
-    - format_probability: Format probability values
-    - format_bps: Format values as basis points
-    - format_markdown_table: Complete markdown table generation with alignment
-  - Tested all utility functions successfully
+- Task 3.1: Implement Polymarket Gamma client (polyarb/clients/polymarket_gamma.py)
+  - Created GammaClient class for Polymarket Gamma API integration
+    - Base URL: https://gamma-api.polymarket.com
+    - Implements get_market(market_id) -> Market: Fetch market details by ID
+    - Implements search_markets(query, limit, offset, closed, archived) -> list[Market]: Search markets
+    - Robust error handling with custom GammaClientError exception
+    - Graceful parsing of various API response formats (direct list or data wrapper)
+    - Support for multiple field name variations (id/condition_id/conditionId, endDate/end_date/expirationDate, etc.)
+    - Parse CLOB token IDs in both list and dict formats
+    - Properly maps outcomes to token IDs for Yes/No determination
+  - Created comprehensive test suite (tests/test_gamma_client.py)
+    - 10 test cases covering all client methods
+    - Mock httpx.Client for isolated unit testing
+    - Test edge cases: 404 errors, missing fields, alternate field names, data wrapper formats
+    - All tests passing successfully
