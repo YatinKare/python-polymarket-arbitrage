@@ -257,28 +257,167 @@ def analyze(
       polyarb analyze 12345 --ticker BTC-USD --event-type touch --level 80000
       polyarb analyze 67890 --ticker SPY --event-type above --level 500 --rate 0.045
     """
+    from datetime import datetime, date
+    from polyarb.clients.polymarket_gamma import GammaClient
+
     ctx.log(f"Analyzing market: {market_id}")
 
-    # TODO: Implementation will be added in tasks 7.3 and 7.4
-    click.echo("Analyze command: Not yet implemented (tasks 7.3-7.4)")
-    click.echo(f"  Market ID: {market_id}")
-    click.echo(f"  Ticker: {ticker}")
-    click.echo(f"  Event Type: {event_type}")
-    click.echo(f"  Level: {level}")
-    click.echo(f"  Expiry: {expiry}")
-    click.echo(f"  Yes Price: {yes_price}")
-    click.echo(f"  No Price: {no_price}")
-    click.echo(f"  Rate: {rate}")
-    click.echo(f"  FRED Series ID: {fred_series_id}")
-    click.echo(f"  Div Yield: {div_yield}")
-    click.echo(f"  IV Mode: {iv_mode}")
-    click.echo(f"  IV: {iv}")
-    click.echo(f"  IV Strike Window: {iv_strike_window}")
-    click.echo(f"  Abs Tol: {abs_tol}")
-    click.echo(f"  Pct Tol: {pct_tol}")
-    click.echo(f"  Output: {output}")
-    click.echo(f"  Format: {output_format}")
-    click.echo(f"  Outcome Label: {outcome_label}")
+    # Step 1: Fetch market metadata from Gamma
+    try:
+        ctx.log("Fetching market data from Polymarket Gamma API...")
+        gamma_client = GammaClient()
+        market = gamma_client.get_market(market_id)
+        ctx.log(f"Market: {market.title}")
+    except Exception as e:
+        click.echo(f"Error fetching market: {e}", err=True)
+        sys.exit(1)
+
+    # Step 2: Prompt for missing required inputs
+
+    # Ticker (required)
+    if not ticker:
+        ticker = click.prompt("Enter yfinance ticker symbol (e.g., SPY, BTC-USD)", type=str)
+
+    # Event type (required)
+    if not event_type:
+        event_type = click.prompt(
+            "Select event type",
+            type=click.Choice(["touch", "above", "below"], case_sensitive=False),
+        )
+    event_type = event_type.lower()
+
+    # Level (required)
+    if level is None:
+        level = click.prompt(
+            f"Enter {'barrier level' if event_type == 'touch' else 'strike price'}",
+            type=float,
+        )
+
+    # Expiry (use market end date if not provided)
+    if expiry is None:
+        if market.end_date:
+            expiry_date = market.end_date
+            ctx.log(f"Using market end date as expiry: {expiry_date.strftime('%Y-%m-%d')}")
+        else:
+            # Market has no end date, prompt user
+            expiry_str = click.prompt("Enter expiry date (YYYY-MM-DD)", type=str)
+            try:
+                expiry_date = datetime.strptime(expiry_str, "%Y-%m-%d").date()
+            except ValueError:
+                click.echo(f"Error: Invalid date format '{expiry_str}'. Use YYYY-MM-DD.", err=True)
+                sys.exit(1)
+    else:
+        # Convert click.DateTime to date
+        expiry_date = expiry.date() if isinstance(expiry, datetime) else expiry
+        # Warn if user override differs from market end date
+        if market.end_date and expiry_date != market.end_date:
+            click.echo(
+                f"Warning: User-provided expiry ({expiry_date}) differs from "
+                f"market end date ({market.end_date}).",
+                err=True,
+            )
+
+    # Step 3: Validate inputs
+    validation_errors = []
+
+    # Expiry must be in the future
+    today = date.today()
+    if expiry_date <= today:
+        validation_errors.append(f"Expiry date {expiry_date} must be in the future (today: {today})")
+
+    # Level must be positive
+    if level <= 0:
+        validation_errors.append(f"Level/strike must be positive (got: {level})")
+
+    # Yes/No prices must be in [0, 1] if provided
+    if yes_price is not None and not (0 <= yes_price <= 1):
+        validation_errors.append(f"Yes price must be in [0, 1] (got: {yes_price})")
+    if no_price is not None and not (0 <= no_price <= 1):
+        validation_errors.append(f"No price must be in [0, 1] (got: {no_price})")
+
+    # IV must be positive if provided
+    if iv is not None and iv <= 0:
+        validation_errors.append(f"Implied volatility must be positive (got: {iv})")
+
+    # Manual IV mode requires --iv
+    if iv_mode.lower() == "manual" and iv is None:
+        validation_errors.append("Manual IV mode requires --iv parameter")
+
+    # Rate: must have either --rate OR --fred-series-id
+    if rate is None and fred_series_id is None:
+        validation_errors.append(
+            "Must provide either --rate or --fred-series-id for risk-free rate"
+        )
+
+    # Both rate and fred-series-id provided (warn but allow, prefer user-provided rate)
+    if rate is not None and fred_series_id is not None:
+        click.echo(
+            "Warning: Both --rate and --fred-series-id provided. Using --rate.",
+            err=True,
+        )
+
+    # Validate rate is reasonable if provided
+    if rate is not None and not (-0.1 <= rate <= 0.3):
+        click.echo(
+            f"Warning: Risk-free rate {rate:.1%} seems unusual (expected -10% to 30%).",
+            err=True,
+        )
+
+    # Validate dividend yield is reasonable
+    if not (0 <= div_yield <= 0.2):
+        click.echo(
+            f"Warning: Dividend yield {div_yield:.1%} seems unusual (expected 0% to 20%).",
+            err=True,
+        )
+
+    # IV strike window must be positive
+    if iv_strike_window <= 0:
+        validation_errors.append(f"IV strike window must be positive (got: {iv_strike_window})")
+
+    # Tolerances must be non-negative
+    if abs_tol < 0:
+        validation_errors.append(f"Absolute tolerance must be non-negative (got: {abs_tol})")
+    if pct_tol < 0:
+        validation_errors.append(f"Percentage tolerance must be non-negative (got: {pct_tol})")
+
+    # Report validation errors
+    if validation_errors:
+        click.echo("Validation errors:", err=True)
+        for error in validation_errors:
+            click.echo(f"  - {error}", err=True)
+        sys.exit(1)
+
+    # Step 4: Warn about default dividend yield
+    if div_yield == 0.0:
+        ctx.log("Warning: Using default dividend yield of 0% (not provided)")
+
+    # Step 5: Store validated inputs for orchestration (task 7.4)
+    ctx.log("Input validation complete")
+    ctx.log(f"  Market: {market.title}")
+    ctx.log(f"  Ticker: {ticker}")
+    ctx.log(f"  Event Type: {event_type}")
+    ctx.log(f"  Level: {level}")
+    ctx.log(f"  Expiry: {expiry_date}")
+    ctx.log(f"  Risk-free rate: {'from FRED ' + fred_series_id if rate is None else f'{rate:.4f}'}")
+    ctx.log(f"  Dividend yield: {div_yield:.4f}")
+    ctx.log(f"  IV mode: {iv_mode}")
+
+    # TODO: Task 7.4 will implement the orchestration logic here
+    click.echo("\n=== Analysis ===")
+    click.echo("Orchestration logic not yet implemented (task 7.4)")
+    click.echo(f"Market ID: {market_id}")
+    click.echo(f"Market Title: {market.title}")
+    click.echo(f"Market End Date: {market.end_date}")
+    click.echo(f"Ticker: {ticker}")
+    click.echo(f"Event Type: {event_type}")
+    click.echo(f"Level: {level}")
+    click.echo(f"Expiry: {expiry_date}")
+    click.echo(f"Rate: {rate}")
+    click.echo(f"FRED Series ID: {fred_series_id}")
+    click.echo(f"Div Yield: {div_yield}")
+    click.echo(f"IV Mode: {iv_mode}")
+    click.echo(f"IV: {iv}")
+    click.echo(f"Outcome Label: {outcome_label}")
 
 
 @main.command()

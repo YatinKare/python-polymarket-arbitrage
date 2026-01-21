@@ -193,7 +193,7 @@ From the plan analysis, must handle:
   - Call GammaClient.search_markets()
   - Output table: id, title, endDate
 
-- [ ] 7.3: Implement `analyze` command - input handling
+- [x] 7.3: Implement `analyze` command - input handling
   - Core inputs: MARKET_ID (required), --ticker, --event-type, --level, --expiry
   - Price inputs: --yes-price, --no-price (optional, fetch from CLOB if not provided)
   - Rate inputs: --rate OR --fred-series-id
@@ -375,6 +375,46 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
+- Task 7.3: Implement `analyze` command - input handling
+  - Implemented comprehensive input validation and prompting in polyarb/cli.py
+    - Fetches market metadata from Gamma API to get default expiry (end_date)
+    - Prompts for missing required inputs: ticker, event-type, level
+    - Uses market end_date as default expiry if not provided by user
+    - Validates all inputs before proceeding to orchestration:
+      - Expiry must be in the future (checked against today's date)
+      - Level/strike must be positive
+      - Yes/No prices must be in [0, 1] range if provided
+      - IV must be positive if provided
+      - Manual IV mode requires --iv parameter
+      - Must have either --rate or --fred-series-id for risk-free rate
+      - IV strike window must be positive
+      - Tolerances (abs_tol, pct_tol) must be non-negative
+    - Issues warnings for edge cases:
+      - Both --rate and --fred-series-id provided (uses --rate, warns)
+      - Unusual rate values outside [-10%, 30%]
+      - Unusual dividend yield outside [0%, 20%]
+      - User-provided expiry differs from market end date
+      - Default dividend yield of 0% if not provided
+    - Comprehensive error reporting: collects all validation errors and displays them together
+    - Clear, user-friendly error messages with actual values shown
+  - Created test suite for CLI validation (tests/test_cli_validation.py)
+    - 11 test cases covering all validation scenarios
+    - Tests negative level validation
+    - Tests expiry in past validation
+    - Tests yes/no price range validation
+    - Tests manual IV mode validation
+    - Tests missing rate validation
+    - Tests negative IV validation
+    - Tests valid inputs pass through
+    - Tests warning for both rate sources
+    - Tests warning for unusual rates
+    - Tests market end date usage
+    - Tests expiry override warning
+    - All 11 tests passing
+  - Full test suite status: 237 tests passing (226 existing + 11 new CLI validation tests)
+  - Input handling complete, ready for task 7.4 (orchestration logic)
+
+Previous iteration:
 - Task 7.1: CLI command structure (already complete - marked as done)
 - Task 7.2: Implement `markets` command
   - Implemented markets listing/search functionality in polyarb/cli.py
