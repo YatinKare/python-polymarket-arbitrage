@@ -710,12 +710,60 @@ def rates(ctx: PolyarbContext, series_id: Optional[str], search: Optional[str]):
         click.echo("Error: Must provide either --series-id or --search", err=True)
         sys.exit(1)
 
-    ctx.log("Fetching data from FRED API...")
+    from polyarb.clients.fred import FredClient
 
-    # TODO: Implementation will be added in task 7.5
-    click.echo("Rates command: Not yet implemented (task 7.5)")
-    click.echo(f"  Series ID: {series_id}")
-    click.echo(f"  Search: {search}")
+    try:
+        fred_client = FredClient(api_key=ctx.fred_api_key)
+
+        if search:
+            # Search for series by keyword
+            ctx.log(f"Searching for series matching '{search}'...")
+            results = fred_client.search_series(query=search, limit=10)
+
+            if not results:
+                click.echo(f"No series found matching '{search}'")
+                return
+
+            click.echo(f"\nFound {len(results)} series:\n")
+            for i, series in enumerate(results, 1):
+                title = series.get("title", "N/A")
+                series_id_result = series.get("id", "N/A")
+                units = series.get("units", "N/A")
+                frequency = series.get("frequency", "N/A")
+
+                click.echo(f"{i}. {series_id_result}")
+                click.echo(f"   Title: {title}")
+                click.echo(f"   Units: {units}, Frequency: {frequency}")
+                click.echo()
+
+        if series_id:
+            # Fetch latest observation for the series
+            ctx.log(f"Fetching latest observation for series {series_id}...")
+
+            # Get series info
+            info = fred_client.get_series_info(series_id)
+            title = info.get("title", "N/A")
+            units = info.get("units", "N/A")
+
+            # Get latest observation
+            value, obs_date = fred_client.get_latest_observation(series_id)
+
+            click.echo(f"\nSeries: {series_id}")
+            click.echo(f"Title: {title}")
+            click.echo(f"Units: {units}")
+            click.echo(f"Latest observation: {value} (as of {obs_date})")
+
+            # If units indicate percentage, also show as decimal
+            if "percent" in units.lower():
+                decimal_value = value / 100
+                click.echo(f"Decimal form: {decimal_value:.6f}")
+
+    except Exception as e:
+        ctx.log(f"Error fetching FRED data: {e}", level="error")
+        if ctx.verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == "__main__":

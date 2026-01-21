@@ -216,15 +216,16 @@ From the plan analysis, must handle:
   - Generate markdown report
   - Write to file if --output provided, else print to stdout
 
-- [ ] 7.5: Implement `rates` command (optional)
+- [x] 7.5: Implement `rates` command (optional)
   - Options: --series-id OR --search
   - Fetch and print latest rate value from FRED
 
-- [ ] 7.6: Add input validation
+- [x] 7.6: Add input validation
   - validate_inputs() function
   - Check: expiry in future, level > 0, IV > 0, yes/no prices in [0,1]
   - Warn if dividend yield not provided (default to 0)
   - Warn if Polymarket expiry differs from user override
+  - NOTE: Completed in task 7.3 (validation integrated into analyze command)
 
 ### Phase 8: Testing
 - [ ] 8.1: Create test fixtures
@@ -375,6 +376,48 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
+- Task 7.5: Implement `rates` command (optional)
+  - Implemented FRED rate fetching and search in polyarb/cli.py (lines 713-767)
+    - Two operation modes:
+      - `--search`: Search for rate series by keyword (e.g., "treasury bill", "federal funds")
+        - Calls FredClient.search_series() with query and limit=10
+        - Displays formatted results table with series ID, title, units, frequency
+        - Shows 10 matching series with all metadata
+      - `--series-id`: Fetch latest observation for specific series (e.g., DGS3MO, DFF)
+        - Calls FredClient.get_series_info() for metadata
+        - Calls FredClient.get_latest_observation() for latest value and date
+        - Displays series title, units, latest value, and observation date
+        - Automatically converts percentage to decimal form for convenience
+    - Both options can be used together (search first, then specific series)
+    - Error handling:
+      - Checks for FRED_API_KEY environment variable (exits with helpful message if missing)
+      - Validates at least one of --search or --series-id is provided
+      - Catches and displays FRED API errors (invalid series, network errors, etc.)
+      - Verbose mode shows full traceback for debugging
+    - User-friendly output:
+      - Clear formatting with series metadata
+      - Percentage values shown both as-is and in decimal form
+      - Observation dates included for currency
+  - Testing:
+    - Manually tested with real FRED API:
+      - Search for "treasury bill": Returns 10 series (DTB3, DGS3MO, etc.)
+      - Fetch DGS3MO (3-month T-bill): Returns 3.67% as of 2026-01-16
+      - Fetch DFF (federal funds rate): Returns 3.64% as of 2026-01-19
+      - Combined search + fetch: Both operations work together
+      - Invalid series ID: Properly caught and reported
+      - Missing API key: Clear error message with help URL
+    - All 237 existing tests still passing (no regressions)
+  - Command now fully functional and ready for use
+  - Enables users to discover and fetch risk-free rate data for analysis
+
+- Task 7.6: Add input validation
+  - ALREADY COMPLETE (verified in this iteration)
+  - All validation logic was implemented in task 7.3
+  - Integrated into analyze command handler (polyarb/cli.py lines 323-391)
+  - Comprehensive test coverage in tests/test_cli_validation.py (11 tests)
+  - See task 7.3 completion notes for full details
+
+Previous iteration:
 - Task 7.4: Implement `analyze` command - orchestration logic
   - Implemented full end-to-end analysis pipeline in polyarb/cli.py
     - Outcome mapping: Maps Yes/No outcomes to token IDs
