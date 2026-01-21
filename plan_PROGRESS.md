@@ -228,39 +228,48 @@ From the plan analysis, must handle:
   - NOTE: Completed in task 7.3 (validation integrated into analyze command)
 
 ### Phase 8: Testing
-- [ ] 8.1: Create test fixtures
+- [x] 8.1: Create test fixtures
   - tests/fixtures/ directory
   - Mock JSON responses for Gamma, CLOB, FRED APIs
   - Sample option chain DataFrames
+  - NOTE: Tests use pytest-mock inline mocking instead of fixture files (cleaner and more maintainable)
 
-- [ ] 8.2: Write pricing tests
-  - tests/test_pricing_digital.py
+- [x] 8.2: Write pricing tests
+  - tests/test_pricing_digital.py (30 tests)
     - Test edge cases: S0 >> K, S0 << K, σ → 0, T → 0
     - Test symmetry: P(above) + P(below) ≈ 1
-  - tests/test_pricing_touch.py
+    - Test verdict logic and sensitivity analysis
+  - tests/test_pricing_touch.py (26 tests)
     - Test driftless case against known formula
     - Test limits: very high vol, very short T
     - Test probability bounds [0,1]
 
-- [ ] 8.3: Write IV interpolation tests
-  - tests/test_iv_interpolation.py
+- [x] 8.3: Write IV interpolation tests
+  - tests/test_iv_extract.py (32 tests)
     - Test strike region extraction
-    - Test term structure interpolation
-    - Test edge cases (exact match, single expiry)
+    - Test log-moneyness interpolation
+    - Test edge cases (exact match, single expiry, missing IVs)
+  - tests/test_term_structure.py (39 tests)
+    - Test bracketing expiries
+    - Test variance interpolation
+    - Test edge cases (extrapolation, single expiry)
 
 - [x] 8.4: Write report tests
-  - tests/test_report_sections.py
+  - tests/test_report_sections.py (29 tests)
     - Assert all A-G section headers present
     - Check markdown structure validity
     - NOTE: Completed in task 6.1 (report tests written alongside report module)
 
-- [ ] 8.5: Write client tests with mocks
-  - Use pytest-mock to patch httpx.get
-  - Test Gamma, CLOB, FRED clients with fixtures
-  - Test error handling
+- [x] 8.5: Write client tests with mocks
+  - tests/test_gamma_client.py (10 tests)
+  - tests/test_clob_client.py (15 tests)
+  - tests/test_fred_client.py (19 tests)
+  - tests/test_yfinance_md.py (26 tests)
+  - Use pytest-mock to patch httpx.Client and yfinance.Ticker
+  - Test error handling, edge cases, data normalization
 
 ### Phase 9: Documentation & Packaging
-- [ ] 9.1: Write README.md
+- [x] 9.1: Write README.md
   - Project overview and goal
   - Installation: `uv sync` or `uv run polyarb ...`
   - Quickstart examples:
@@ -269,15 +278,17 @@ From the plan analysis, must handle:
   - Environment variables (FRED_API_KEY)
   - Command reference
 
-- [ ] 9.2: Add troubleshooting section to README
+- [x] 9.2: Add troubleshooting section to README
   - yfinance missing IV fields
   - Polymarket token mapping issues
   - FRED key not set
   - Missing option chains
+  - NOTE: Completed as part of task 9.1 (comprehensive README with troubleshooting)
 
-- [ ] 9.3: Verify project.scripts entrypoint
+- [x] 9.3: Verify project.scripts entrypoint
   - Ensure pyproject.toml has `polyarb = "polyarb.cli:main"`
   - Test that `uv run polyarb` works
+  - NOTE: Verified - entrypoint correctly configured and working
 
 ### Phase 10: Integration & Validation
 - [ ] 10.1: Run end-to-end test manually
@@ -376,6 +387,53 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
+- Task 9.1: Write README.md
+  - Created comprehensive README with all required sections
+    - Project overview: Goals, features, and methodology
+    - Installation: Step-by-step setup with uv
+    - Usage: Detailed examples for all three commands (markets, analyze, rates)
+      - Event types explained (touch, above, below)
+      - Required and optional inputs documented
+      - Example commands for common use cases
+    - Report output: Description of all A-G sections
+    - Environment variables: FRED_API_KEY setup
+    - Project structure: Directory layout and module descriptions
+    - Testing: How to run tests and current coverage (237 tests)
+    - Examples: Real-world scenarios (BTC touch, SPY above, manual IV)
+    - Methodology: Explanation of pricing models and IV selection
+      - Digital options (Black-Scholes for terminal events)
+      - Touch barriers (first-passage probability)
+      - IV interpolation (strike region + term structure)
+      - Verdict logic (fair/cheap/expensive thresholds)
+    - Troubleshooting: Comprehensive solutions for common issues
+      - yfinance missing IV fields (auto-expansion, fallbacks)
+      - Polymarket token mapping (multi-outcome prompts)
+      - FRED key not set (error messages and workarounds)
+      - Missing option chains (proxy tickers, manual IV)
+      - Expiry mismatches (term structure interpolation)
+      - High IV warnings (data quality checks)
+    - Limitations: v1 scope and model assumptions clearly stated
+    - Contributing: Areas for future enhancement
+    - Disclaimer: Educational use and risk warnings
+
+- Task 9.2: Add troubleshooting section to README
+  - ALREADY COMPLETE (included in task 9.1)
+  - Troubleshooting section covers all planned issues
+
+- Task 9.3: Verify project.scripts entrypoint
+  - ALREADY COMPLETE (verified in this iteration)
+  - pyproject.toml has correct entrypoint: `polyarb = "polyarb.cli:main"`
+  - Tested successfully with `uv run polyarb --help`
+
+- Tasks 8.1-8.5: Mark existing tests as complete
+  - All test modules already exist and passing (237 tests total)
+  - Task 8.1: Using inline mocks instead of fixture files (better practice)
+  - Task 8.2: Pricing tests complete (30 digital + 26 touch = 56 tests)
+  - Task 8.3: IV interpolation tests complete (32 extract + 39 term = 71 tests)
+  - Task 8.4: Report tests complete (29 tests)
+  - Task 8.5: Client tests complete (10 gamma + 15 clob + 19 fred + 26 yf = 70 tests)
+
+Previous iteration:
 - Task 7.5: Implement `rates` command (optional)
   - Implemented FRED rate fetching and search in polyarb/cli.py (lines 713-767)
     - Two operation modes:
