@@ -156,7 +156,7 @@ From the plan analysis, must handle:
   - PV = exp(-rT) * P
   - Add sensitivity analysis (vary sigma by ±0.02, ±0.03)
 
-- [ ] 5.2: Implement touch barrier pricing (polyarb/pricing/touch_barrier.py)
+- [x] 5.2: Implement touch barrier pricing (polyarb/pricing/touch_barrier.py)
   - touch_price(S0, B, T, r, q, sigma) -> (probability, pv)
   - Determine barrier direction (upper if B > S0, lower if B < S0)
   - Use log-process first-passage probability with drift
@@ -373,6 +373,63 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
+- Task 5.2: Implement touch barrier pricing (polyarb/pricing/touch_barrier.py)
+  - Created touch barrier pricing module for barrier hit (touch) events
+    - Implements touch_price(S0, B, T, r, q, sigma) -> PricingResult
+      - Determines barrier direction automatically (up if B > S0, down if B < S0)
+      - Uses geometric Brownian motion with risk-neutral drift μ = r - q - 0.5σ²
+      - Implements reflection principle for first-passage probability
+      - Handles special case: barrier equals spot (probability = 1)
+      - Handles driftless case (μ ≈ 0) with simplified formula: P(hit) = 2 * N(-|a|/(σ√T))
+      - General case with drift uses two-term formula:
+        - Upper barrier: P = N(-(a - μT)/(σ√T)) + exp(2λa) * N(-(a + μT)/(σ√T))
+        - Lower barrier: P = N((a - μT)/(σ√T)) + exp(2λa) * N((a + μT)/(σ√T))
+        - where λ = μ / σ², a = ln(B/S0)
+      - PV = exp(-rT) * P(hit) for proper discounting
+      - Returns PricingResult with probability, pv, and drift (d2=None for touch)
+      - Validates all inputs: S0, B, T, sigma > 0
+      - Clamps probability to [0, 1] to handle numerical edge cases
+    - Implements touch_price_with_sensitivity(...) -> PricingResult
+      - Computes base price plus sensitivity to volatility shifts
+      - Default shifts: [-0.03, -0.02, 0.02, 0.03] (customizable)
+      - Clamps shifted sigma to minimum 0.01 (1%) to avoid negative values
+      - Returns sensitivity dict: {"sigma-0.02": (prob, pv), "sigma+0.02": (prob, pv), ...}
+      - Useful for understanding pricing sensitivity to IV uncertainty
+    - Custom exception: TouchPricingError for clear error handling
+    - Robust input validation and error messages
+  - Created comprehensive test suite (tests/test_pricing_touch.py)
+    - 26 test cases covering all functions and edge cases
+    - Test touch_price: 21 tests
+      - Barrier equals spot (probability = 1)
+      - Driftless cases for upper/lower barriers (μ = 0)
+      - Upper barrier with positive drift (r > q + 0.5σ²)
+      - Lower barrier with negative drift (r < q + 0.5σ²)
+      - High volatility increases hit probability
+      - Short time reduces hit probability for OTM barrier
+      - Very close barrier has high probability (>0.9)
+      - Very far barrier has low probability (<0.1)
+      - Discounting correctness verification
+      - Probability bounds [0, 1] for various scenarios
+      - Drift calculation verification
+      - d2 field is None (not applicable for touch)
+      - Input validation: negative/zero S0, B, T, sigma
+    - Test touch_price_with_sensitivity: 5 tests
+      - Default and custom sigma shifts
+      - Low base sigma handling (clamping to min 0.01)
+      - Monotonicity for OTM barrier (higher vol → higher prob)
+      - Base result matches direct call
+    - All 26 tests passing
+  - Full test suite status: 197 tests passing (171 existing + 26 new)
+    - 10 Gamma client tests
+    - 15 CLOB client tests
+    - 19 FRED client tests
+    - 26 yfinance client tests
+    - 32 IV extraction tests
+    - 39 term structure tests
+    - 30 digital pricing tests
+    - 26 touch barrier pricing tests
+
+Previous iterations:
 - Task 5.1: Implement digital option pricing (polyarb/pricing/digital_bs.py)
   - Created digital option pricing module for terminal settle-at-expiry events
     - Implements digital_price(S0, K, T, r, q, sigma, direction) -> PricingResult
