@@ -96,7 +96,7 @@ From the plan analysis, must handle:
   - Create tests/ directory
 
 ### Phase 2: Data Models & Utilities
-- [ ] 2.1: Define core data models in polyarb/models.py
+- [x] 2.1: Define core data models in polyarb/models.py
   - Market model (id, title, endDate, clobTokenIds, outcomes)
   - TokenPrice model (token_id, side, price)
   - AnalysisInputs model (ticker, event_type, level, expiry, etc.)
@@ -373,12 +373,14 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
-- Task 1.2: Create package directory structure
-  - Created polyarb/ main package directory with __init__.py (version 0.1.0)
-  - Created polyarb/util/ with __init__.py and stub files: dates.py, math.py, fmt.py
-  - Created polyarb/clients/ with __init__.py
-  - Created polyarb/vol/ with __init__.py
-  - Created polyarb/pricing/ with __init__.py
-  - Created polyarb/report/ with __init__.py
-  - Created tests/ directory
-  - Verified package can be imported successfully
+- Task 2.1: Define core data models in polyarb/models.py
+  - Created comprehensive data models using dataclasses
+  - Implemented Market model with binary outcome detection
+  - Implemented TokenPrice and OrderBook models for CLOB data
+  - Implemented AnalysisInputs with full validation logic
+  - Implemented PricingResult with sensitivity analysis support
+  - Implemented AnalysisResults for complete analysis output
+  - Implemented ReportContext for A-G report generation
+  - Added enums for EventType, Side, IVMode, and Verdict
+  - Included validation methods and helpful properties
+  - Verified all models can be imported successfully
