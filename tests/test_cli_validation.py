@@ -2,12 +2,14 @@
 
 from datetime import date, timedelta
 from unittest.mock import Mock, patch
+from contextlib import contextmanager
 
 import pytest
 from click.testing import CliRunner
+import pandas as pd
 
 from polyarb.cli import main
-from polyarb.models import Market
+from polyarb.models import Market, PricingResult
 
 
 @pytest.fixture
@@ -22,6 +24,67 @@ def mock_market():
         clob_token_ids={"Yes": "token-yes", "No": "token-no"},
         outcomes=["Yes", "No"],
     )
+
+
+@contextmanager
+def mock_orchestration_dependencies():
+    """Context manager to mock all orchestration dependencies for tests."""
+    # Create mock pricing result
+    mock_pricing_result = PricingResult(
+        probability=0.65,
+        pv=0.63,
+        d2=None,
+        drift=-0.02,
+        sensitivity={
+            'sigma-0.03': (0.60, 0.58),
+            'sigma-0.02': (0.62, 0.60),
+            'sigma+0.02': (0.68, 0.66),
+            'sigma+0.03': (0.70, 0.68),
+        }
+    )
+
+    # Create mock option chain data
+    calls_df = pd.DataFrame({
+        'strike': [90000, 95000, 100000, 105000, 110000],
+        'impliedVolatility': [0.55, 0.50, 0.45, 0.42, 0.40]
+    })
+    puts_df = pd.DataFrame({
+        'strike': [90000, 95000, 100000, 105000, 110000],
+        'impliedVolatility': [0.40, 0.42, 0.45, 0.50, 0.55]
+    })
+
+    with patch('polyarb.clients.polymarket_clob.ClobClient') as mock_clob, \
+         patch('polyarb.clients.yfinance_md.YFMarketData') as mock_yf, \
+         patch('polyarb.pricing.touch_barrier.touch_price_with_sensitivity') as mock_touch_pricing, \
+         patch('polyarb.pricing.digital_bs.digital_price_with_sensitivity') as mock_digital_pricing, \
+         patch('polyarb.vol.iv_extract.extract_strike_region_iv') as mock_iv_extract, \
+         patch('polyarb.vol.term_structure.interpolate_iv_term_structure') as mock_iv_interp, \
+         patch('polyarb.clients.fred.FredClient') as mock_fred:
+
+        # Setup mocks
+        mock_clob.return_value.get_yes_price.return_value = 0.65
+        mock_yf.return_value.get_spot.return_value = 95000.0
+        mock_yf.return_value.get_option_expiries.return_value = [
+            date.today() + timedelta(days=7),
+            date.today() + timedelta(days=30),
+            date.today() + timedelta(days=60),
+        ]
+        mock_yf.return_value.get_chain.return_value = (calls_df, puts_df)
+        mock_iv_extract.return_value = 0.45
+        mock_iv_interp.return_value = 0.45
+        mock_touch_pricing.return_value = mock_pricing_result
+        mock_digital_pricing.return_value = mock_pricing_result
+        mock_fred.return_value.get_latest_observation.return_value = (4.0, date.today())
+
+        yield {
+            'clob': mock_clob,
+            'yf': mock_yf,
+            'touch_pricing': mock_touch_pricing,
+            'digital_pricing': mock_digital_pricing,
+            'iv_extract': mock_iv_extract,
+            'iv_interp': mock_iv_interp,
+            'fred': mock_fred,
+        }
 
 
 def test_analyze_validation_negative_level(mock_market):
@@ -178,10 +241,11 @@ def test_analyze_validation_negative_iv(mock_market):
 
 
 def test_analyze_validation_valid_inputs(mock_market):
-    """Test that valid inputs pass validation."""
+    """Test that valid inputs pass validation and run analysis."""
     runner = CliRunner()
 
-    with patch("polyarb.clients.polymarket_gamma.GammaClient") as mock_client:
+    with patch("polyarb.clients.polymarket_gamma.GammaClient") as mock_client, \
+         mock_orchestration_dependencies():
         mock_client.return_value.get_market.return_value = mock_market
 
         result = runner.invoke(
@@ -196,18 +260,18 @@ def test_analyze_validation_valid_inputs(mock_market):
             ],
         )
 
-        # Should pass validation and reach the stub output
+        # Should pass validation and complete analysis
         assert result.exit_code == 0
-        # Check both stdout and stderr (ctx.log goes to stderr)
-        combined_output = result.output + result.stderr
-        assert "Orchestration logic not yet implemented" in result.output
+        # Check that analysis completed (should have report sections)
+        assert "# Polymarket Analysis Report" in result.output or "Analysis complete" in result.stderr
 
 
 def test_analyze_warns_both_rate_and_fred(mock_market):
     """Test that providing both --rate and --fred-series-id issues a warning."""
     runner = CliRunner()
 
-    with patch("polyarb.clients.polymarket_gamma.GammaClient") as mock_client:
+    with patch("polyarb.clients.polymarket_gamma.GammaClient") as mock_client, \
+         mock_orchestration_dependencies():
         mock_client.return_value.get_market.return_value = mock_market
 
         result = runner.invoke(
@@ -225,14 +289,16 @@ def test_analyze_warns_both_rate_and_fred(mock_market):
 
         # Should warn but not fail
         assert result.exit_code == 0
-        assert "Both --rate and --fred-series-id provided" in result.output
+        combined_output = result.output + result.stderr
+        assert "Both --rate and --fred-series-id provided" in combined_output
 
 
 def test_analyze_warns_unusual_rate(mock_market):
     """Test that unusual rate values trigger a warning."""
     runner = CliRunner()
 
-    with patch("polyarb.clients.polymarket_gamma.GammaClient") as mock_client:
+    with patch("polyarb.clients.polymarket_gamma.GammaClient") as mock_client, \
+         mock_orchestration_dependencies():
         mock_client.return_value.get_market.return_value = mock_market
 
         result = runner.invoke(
@@ -249,14 +315,16 @@ def test_analyze_warns_unusual_rate(mock_market):
 
         # Should warn but not fail
         assert result.exit_code == 0
-        assert "seems unusual" in result.output
+        combined_output = result.output + result.stderr
+        assert "seems unusual" in combined_output
 
 
 def test_analyze_uses_market_end_date(mock_market):
     """Test that market end date is used when expiry not provided."""
     runner = CliRunner()
 
-    with patch("polyarb.clients.polymarket_gamma.GammaClient") as mock_client:
+    with patch("polyarb.clients.polymarket_gamma.GammaClient") as mock_client, \
+         mock_orchestration_dependencies():
         mock_client.return_value.get_market.return_value = mock_market
 
         result = runner.invoke(
@@ -272,8 +340,9 @@ def test_analyze_uses_market_end_date(mock_market):
         )
 
         assert result.exit_code == 0
-        # Check that market end date is in the output (cli shows it in stub)
-        assert str(mock_market.end_date) in result.output
+        # Check that market end date is referenced in the output
+        combined_output = result.output + result.stderr
+        assert mock_market.end_date.strftime('%Y-%m-%d') in combined_output
 
 
 def test_analyze_warns_expiry_override(mock_market):
@@ -281,7 +350,8 @@ def test_analyze_warns_expiry_override(mock_market):
     runner = CliRunner()
     different_date = date.today() + timedelta(days=60)
 
-    with patch("polyarb.clients.polymarket_gamma.GammaClient") as mock_client:
+    with patch("polyarb.clients.polymarket_gamma.GammaClient") as mock_client, \
+         mock_orchestration_dependencies():
         mock_client.return_value.get_market.return_value = mock_market
 
         result = runner.invoke(
@@ -298,4 +368,5 @@ def test_analyze_warns_expiry_override(mock_market):
         )
 
         assert result.exit_code == 0
-        assert "differs from market end date" in result.output
+        combined_output = result.output + result.stderr
+        assert "differs from market end date" in combined_output

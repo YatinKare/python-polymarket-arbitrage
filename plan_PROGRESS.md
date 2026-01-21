@@ -203,7 +203,7 @@ From the plan analysis, must handle:
   - Verdict thresholds: --abs-tol, --pct-tol
   - Add click prompts for missing required inputs
 
-- [ ] 7.4: Implement `analyze` command - orchestration logic
+- [x] 7.4: Implement `analyze` command - orchestration logic
   - Fetch market from Gamma (get endDate, token IDs, outcomes)
   - Map Yes/No outcomes to token IDs (handle multi-outcome with prompt)
   - Fetch Polymarket prices from CLOB
@@ -375,6 +375,77 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
+- Task 7.4: Implement `analyze` command - orchestration logic
+  - Implemented full end-to-end analysis pipeline in polyarb/cli.py
+    - Outcome mapping: Maps Yes/No outcomes to token IDs
+      - Binary markets (2 outcomes): Automatically detects Yes/No or uses first/second outcomes
+      - Multi-outcome markets (>2 outcomes): Prompts user to select outcome (by name or number)
+      - Validates outcome exists in market.clob_token_ids
+    - Polymarket price fetching:
+      - Fetches Yes price from CLOB using get_yes_price() if not provided
+      - Optionally fetches No price for binary markets
+      - Uses provided prices if --yes-price/--no-price flags given
+    - Market data fetching (yfinance):
+      - Fetches spot price for ticker using YFMarketData.get_spot()
+      - Gets available option expiries
+      - Fetches option chains (calls/puts) for each expiry
+      - Chooses appropriate chain based on event type (calls for above/touch-up, puts for below/touch-down)
+    - Risk-free rate:
+      - Uses provided --rate if given
+      - Otherwise fetches from FRED using --fred-series-id
+      - Converts FRED percentage to decimal (divides by 100)
+      - Logs rate source in report
+    - IV selection and interpolation:
+      - Manual mode: Uses provided --iv value directly
+      - Auto mode:
+        - Extracts strike-region IV from each expiry using extract_strike_region_iv()
+        - Filters strikes within moneyness window (default ±5%)
+        - Interpolates IV across term structure to target expiry using interpolate_iv_term_structure()
+        - Logs IV for each expiry and final interpolated value
+    - Pricing model selection:
+      - Touch event: Uses touch_price_with_sensitivity() from touch_barrier module
+      - Above/below events: Uses digital_price_with_sensitivity() from digital_bs module
+      - Computes time to expiry in years using compute_time_to_expiry()
+      - Runs sensitivity analysis (±2%, ±3% vol shifts)
+    - Verdict computation:
+      - Uses compute_verdict() to compare Polymarket price vs fair PV
+      - Applies absolute and percentage tolerances (default: 0.01, 5%)
+      - Returns "Fair", "Cheap", or "Expensive"
+      - Computes absolute and percentage mispricing
+    - Report generation:
+      - Builds AnalysisInputs, AnalysisResults, and ReportContext models
+      - Computes additional values: log_moneyness, variance_term
+      - Generates complete A-G markdown report using render()
+      - Writes to file if --output provided, else prints to stdout
+    - Error handling:
+      - Try-catch wraps entire orchestration
+      - Detailed error messages for each step
+      - Verbose mode shows full traceback
+    - Logging:
+      - Progress logged at each major step
+      - Shows fetched prices, IV values, probabilities, verdict
+      - Clear indication when analysis is complete
+  - Fixed datetime/date comparison bug:
+    - market.end_date is datetime but compared with date.today()
+    - Added conversion: market.end_date.date() for comparisons
+    - Fixed both expiry selection and warning logic
+  - Updated CLI validation tests (tests/test_cli_validation.py):
+    - Created mock_orchestration_dependencies() context manager
+      - Mocks ClobClient, YFMarketData, FredClient
+      - Mocks pricing functions (touch_price_with_sensitivity, digital_price_with_sensitivity)
+      - Mocks IV extraction and interpolation functions
+      - Returns realistic test data (spot=$95k, IV=0.45, prob=0.65, pv=0.63)
+    - Updated 5 failing tests to use mock orchestration
+      - test_analyze_validation_valid_inputs: Now expects analysis completion
+      - test_analyze_warns_both_rate_and_fred: Checks stderr for warning
+      - test_analyze_warns_unusual_rate: Checks combined output
+      - test_analyze_uses_market_end_date: Checks date formatting
+      - test_analyze_warns_expiry_override: Checks combined output
+    - All 11 validation tests now passing with full orchestration
+  - Full test suite status: 237 tests passing (all existing tests maintained)
+  - Orchestration complete: analyze command now produces full A-G reports!
+
+Previous iteration:
 - Task 7.3: Implement `analyze` command - input handling
   - Implemented comprehensive input validation and prompting in polyarb/cli.py
     - Fetches market metadata from Gamma API to get default expiry (end_date)

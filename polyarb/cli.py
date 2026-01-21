@@ -296,7 +296,8 @@ def analyze(
     # Expiry (use market end date if not provided)
     if expiry is None:
         if market.end_date:
-            expiry_date = market.end_date
+            # Convert datetime to date if needed
+            expiry_date = market.end_date.date() if isinstance(market.end_date, datetime) else market.end_date
             ctx.log(f"Using market end date as expiry: {expiry_date.strftime('%Y-%m-%d')}")
         else:
             # Market has no end date, prompt user
@@ -310,12 +311,14 @@ def analyze(
         # Convert click.DateTime to date
         expiry_date = expiry.date() if isinstance(expiry, datetime) else expiry
         # Warn if user override differs from market end date
-        if market.end_date and expiry_date != market.end_date:
-            click.echo(
-                f"Warning: User-provided expiry ({expiry_date}) differs from "
-                f"market end date ({market.end_date}).",
-                err=True,
-            )
+        if market.end_date:
+            market_end_date = market.end_date.date() if isinstance(market.end_date, datetime) else market.end_date
+            if expiry_date != market_end_date:
+                click.echo(
+                    f"Warning: User-provided expiry ({expiry_date}) differs from "
+                    f"market end date ({market_end_date}).",
+                    err=True,
+                )
 
     # Step 3: Validate inputs
     validation_errors = []
@@ -402,22 +405,274 @@ def analyze(
     ctx.log(f"  Dividend yield: {div_yield:.4f}")
     ctx.log(f"  IV mode: {iv_mode}")
 
-    # TODO: Task 7.4 will implement the orchestration logic here
-    click.echo("\n=== Analysis ===")
-    click.echo("Orchestration logic not yet implemented (task 7.4)")
-    click.echo(f"Market ID: {market_id}")
-    click.echo(f"Market Title: {market.title}")
-    click.echo(f"Market End Date: {market.end_date}")
-    click.echo(f"Ticker: {ticker}")
-    click.echo(f"Event Type: {event_type}")
-    click.echo(f"Level: {level}")
-    click.echo(f"Expiry: {expiry_date}")
-    click.echo(f"Rate: {rate}")
-    click.echo(f"FRED Series ID: {fred_series_id}")
-    click.echo(f"Div Yield: {div_yield}")
-    click.echo(f"IV Mode: {iv_mode}")
-    click.echo(f"IV: {iv}")
-    click.echo(f"Outcome Label: {outcome_label}")
+    # Step 6: Orchestration - fetch all data and run analysis
+    try:
+        # Import required modules
+        from polyarb.clients.polymarket_clob import ClobClient
+        from polyarb.clients.fred import FredClient
+        from polyarb.clients.yfinance_md import YFMarketData
+        from polyarb.vol.iv_extract import extract_strike_region_iv
+        from polyarb.vol.term_structure import interpolate_iv_term_structure, compute_time_to_expiry
+        from polyarb.pricing.digital_bs import digital_price_with_sensitivity, compute_verdict
+        from polyarb.pricing.touch_barrier import touch_price_with_sensitivity
+        from polyarb.report.markdown_report import render
+        from polyarb.models import ReportContext
+
+        # 6.1: Map Yes/No outcomes to token IDs
+        ctx.log("Mapping outcomes to token IDs...")
+
+        # For markets with 2 outcomes (typical binary markets)
+        if len(market.outcomes) == 2:
+            # Try to find Yes/No automatically
+            yes_outcome = None
+            no_outcome = None
+
+            for outcome_name, token_id in market.clob_token_ids.items():
+                if outcome_name.lower() in ['yes', 'y']:
+                    yes_outcome = outcome_name
+                elif outcome_name.lower() in ['no', 'n']:
+                    no_outcome = outcome_name
+
+            # If not found, use first/second outcomes
+            if yes_outcome is None or no_outcome is None:
+                outcome_names = list(market.clob_token_ids.keys())
+                yes_outcome = outcome_names[0]
+                no_outcome = outcome_names[1] if len(outcome_names) > 1 else None
+                ctx.log(f"Using outcomes: Yes='{yes_outcome}', No='{no_outcome}'")
+
+        # For multi-outcome markets (>2 outcomes)
+        elif len(market.outcomes) > 2:
+            if outcome_label is None:
+                # Prompt user to select outcome
+                click.echo("\nThis market has multiple outcomes:")
+                for i, outcome_name in enumerate(market.clob_token_ids.keys()):
+                    click.echo(f"  {i+1}. {outcome_name}")
+                outcome_label = click.prompt("Select outcome (enter name or number)", type=str)
+
+                # Allow numeric selection
+                try:
+                    idx = int(outcome_label) - 1
+                    outcome_label = list(market.clob_token_ids.keys())[idx]
+                except (ValueError, IndexError):
+                    pass
+
+            # Validate outcome label exists
+            if outcome_label not in market.clob_token_ids:
+                click.echo(f"Error: Outcome '{outcome_label}' not found in market outcomes", err=True)
+                click.echo(f"Available outcomes: {', '.join(market.clob_token_ids.keys())}", err=True)
+                sys.exit(1)
+
+            yes_outcome = outcome_label
+            no_outcome = None
+            ctx.log(f"Using selected outcome: '{yes_outcome}'")
+
+        else:
+            click.echo("Error: Market has no outcomes with token IDs", err=True)
+            sys.exit(1)
+
+        yes_token_id = market.clob_token_ids[yes_outcome]
+
+        # 6.2: Fetch Polymarket prices from CLOB
+        if yes_price is None:
+            ctx.log(f"Fetching Yes price from CLOB for token {yes_token_id}...")
+            clob_client = ClobClient()
+            yes_price = clob_client.get_yes_price(yes_token_id)
+            ctx.log(f"Yes price: ${yes_price:.4f}")
+        else:
+            ctx.log(f"Using provided Yes price: ${yes_price:.4f}")
+
+        if no_price is None and no_outcome is not None:
+            no_token_id = market.clob_token_ids[no_outcome]
+            ctx.log(f"Fetching No price from CLOB for token {no_token_id}...")
+            no_price = clob_client.get_yes_price(no_token_id)
+            ctx.log(f"No price: ${no_price:.4f}")
+
+        # 6.3: Fetch yfinance spot price
+        ctx.log(f"Fetching spot price for {ticker}...")
+        yf_client = YFMarketData()
+        spot_price = yf_client.get_spot(ticker)
+        ctx.log(f"Spot price: ${spot_price:,.2f}")
+
+        # 6.4: Fetch or use provided risk-free rate
+        if rate is None:
+            ctx.log(f"Fetching risk-free rate from FRED series {fred_series_id}...")
+            fred_client = FredClient(api_key=ctx.fred_api_key)
+            rate_value, rate_date = fred_client.get_latest_observation(fred_series_id)
+            rate = rate_value / 100.0  # Convert from percentage to decimal
+            ctx.log(f"Risk-free rate: {rate:.4%} (from {rate_date})")
+            rate_source = f"FRED {fred_series_id} ({rate_date})"
+        else:
+            ctx.log(f"Using provided rate: {rate:.4%}")
+            rate_source = "User-provided"
+
+        # 6.5: Select IV using vol module (strike region + term structure)
+        if iv_mode.lower() == "manual":
+            ctx.log(f"Using manual IV: {iv:.4f}")
+            sigma = iv
+            iv_source = "User-provided"
+        else:
+            ctx.log(f"Extracting IV from {ticker} option chain...")
+
+            # Get available option expiries
+            expiries = yf_client.get_option_expiries(ticker)
+            ctx.log(f"Found {len(expiries)} option expiries")
+
+            # For each expiry, extract strike-region IV
+            expiry_iv_pairs = []
+            for exp_date in expiries:
+                try:
+                    calls_df, puts_df = yf_client.get_chain(ticker, exp_date)
+
+                    # Use calls for above/touch, puts for below
+                    # For touch, use the chain that has the barrier (calls if barrier > spot, puts if barrier < spot)
+                    if event_type == "below" or (event_type == "touch" and level < spot_price):
+                        chain_df = puts_df
+                        chain_type = "puts"
+                    else:
+                        chain_df = calls_df
+                        chain_type = "calls"
+
+                    # Extract IV for strike region
+                    iv_value = extract_strike_region_iv(chain_df, level, iv_strike_window)
+                    expiry_iv_pairs.append((exp_date, iv_value))
+                    ctx.log(f"  {exp_date}: IV = {iv_value:.4f} (from {chain_type})")
+                except Exception as e:
+                    ctx.log(f"  {exp_date}: Skipped ({str(e)})", level="warning")
+
+            if not expiry_iv_pairs:
+                click.echo("Error: Could not extract IV from any option expiry", err=True)
+                sys.exit(1)
+
+            # Interpolate to target expiry using term structure
+            ctx.log(f"Interpolating IV to target expiry {expiry_date}...")
+            sigma = interpolate_iv_term_structure(expiry_date, expiry_iv_pairs, today)
+            ctx.log(f"Interpolated IV: {sigma:.4f}")
+            iv_source = f"yfinance option chain (interpolated from {len(expiry_iv_pairs)} expiries)"
+
+        # 6.6: Choose pricing model and run analysis
+        ctx.log(f"Running {event_type} pricing model...")
+
+        T = compute_time_to_expiry(expiry_date, today)
+        ctx.log(f"Time to expiry: {T:.4f} years ({(T * 365):.0f} days)")
+
+        if event_type == "touch":
+            # Touch barrier pricing
+            result = touch_price_with_sensitivity(
+                S0=spot_price,
+                B=level,
+                T=T,
+                r=rate,
+                q=div_yield,
+                sigma=sigma,
+            )
+            model_name = "Touch Barrier"
+        else:
+            # Digital option pricing (above or below)
+            result = digital_price_with_sensitivity(
+                S0=spot_price,
+                K=level,
+                T=T,
+                r=rate,
+                q=div_yield,
+                sigma=sigma,
+                direction=event_type,
+            )
+            model_name = f"Digital Option ({'Above' if event_type == 'above' else 'Below'})"
+
+        ctx.log(f"Event probability: {result.probability:.4%}")
+        ctx.log(f"Fair PV: ${result.pv:.4f}")
+
+        # 6.7: Compute verdict
+        verdict = compute_verdict(yes_price, result.pv, abs_tol, pct_tol)
+        mispricing_abs = yes_price - result.pv
+        mispricing_pct = (mispricing_abs / result.pv) if result.pv > 0 else 0
+
+        ctx.log(f"Verdict: {verdict}")
+        ctx.log(f"Mispricing: ${mispricing_abs:+.4f} ({mispricing_pct:+.2%})")
+
+        # 6.8: Build ReportContext
+        ctx.log("Building report context...")
+
+        from polyarb.models import AnalysisInputs, AnalysisResults, EventType, IVMode, Verdict
+        import math
+
+        # Build AnalysisInputs
+        inputs = AnalysisInputs(
+            market_id=market_id,
+            ticker=ticker,
+            event_type=EventType(event_type),
+            level=level,
+            expiry=expiry_date,
+            yes_price=yes_price,
+            no_price=no_price,
+            spot_price=spot_price,
+            rate=rate,
+            fred_series_id=fred_series_id,
+            div_yield=div_yield,
+            iv_mode=IVMode(iv_mode.lower()),
+            iv=iv if iv_mode.lower() == "manual" else sigma,
+            iv_strike_window=iv_strike_window,
+            abs_tol=abs_tol,
+            pct_tol=pct_tol,
+            output_path=output,
+            output_format=output_format,
+            outcome_label=outcome_label,
+        )
+
+        # Build AnalysisResults
+        analysis_results = AnalysisResults(
+            inputs=inputs,
+            market=market,
+            spot_price=spot_price,
+            risk_free_rate=rate,
+            implied_vol=sigma,
+            time_to_expiry=T,
+            pricing=result,
+            poly_yes_price=yes_price,
+            poly_no_price=no_price if no_price is not None else 0.0,
+            verdict=Verdict(verdict),
+            mispricing_abs=mispricing_abs,
+            mispricing_pct=mispricing_pct,
+            iv_source=iv_source,
+            rate_source=rate_source,
+        )
+
+        # Compute additional values for report context
+        log_moneyness = math.log(spot_price / level)
+        variance_term = sigma * math.sqrt(T)
+
+        # Build ReportContext
+        report_ctx = ReportContext(
+            results=analysis_results,
+            log_moneyness=log_moneyness,
+            variance_term=variance_term,
+            model_name=model_name,
+            model_rationale=None,  # Will use default generation
+        )
+
+        # 6.9: Generate markdown report
+        ctx.log("Generating markdown report...")
+        report_markdown = render(report_ctx)
+
+        # 6.10: Output report
+        if output:
+            ctx.log(f"Writing report to {output}...")
+            with open(output, 'w') as f:
+                f.write(report_markdown)
+            click.echo(f"Report written to: {output}")
+        else:
+            click.echo("\n" + "="*80)
+            click.echo(report_markdown)
+            click.echo("="*80)
+
+        ctx.log("Analysis complete!")
+
+    except Exception as e:
+        click.echo(f"Error during analysis: {e}", err=True)
+        if ctx.verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
 
 
 @main.command()
