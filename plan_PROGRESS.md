@@ -103,7 +103,7 @@ From the plan analysis, must handle:
   - AnalysisResults model (probability, pv, verdict, etc.)
   - ReportContext model (all data for A-G sections)
 
-- [ ] 2.2: Implement utility modules
+- [x] 2.2: Implement utility modules
   - polyarb/util/dates.py: date parsing, validation, time-to-expiry calculation
   - polyarb/util/math.py: basic math helpers (log, exp, clamp)
   - polyarb/util/fmt.py: number formatting for tables/reports
@@ -373,14 +373,25 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
-- Task 2.1: Define core data models in polyarb/models.py
-  - Created comprehensive data models using dataclasses
-  - Implemented Market model with binary outcome detection
-  - Implemented TokenPrice and OrderBook models for CLOB data
-  - Implemented AnalysisInputs with full validation logic
-  - Implemented PricingResult with sensitivity analysis support
-  - Implemented AnalysisResults for complete analysis output
-  - Implemented ReportContext for A-G report generation
-  - Added enums for EventType, Side, IVMode, and Verdict
-  - Included validation methods and helpful properties
-  - Verified all models can be imported successfully
+- Task 2.2: Implement utility modules
+  - Implemented polyarb/util/dates.py with date parsing and time-to-expiry calculation
+    - parse_date: Parse YYYY-MM-DD date strings
+    - parse_datetime: Parse ISO 8601 datetime strings with UTC timezone handling
+    - validate_future_date: Validate dates are in the future
+    - time_to_expiry_years: Calculate time to expiry using 365-day convention
+    - format_date: Format dates as YYYY-MM-DD strings
+  - Implemented polyarb/util/math.py with mathematical helper functions
+    - safe_log: Natural logarithm with protection against invalid inputs
+    - safe_exp: Exponential with overflow protection
+    - clamp: Clamp values within min/max range
+    - is_close: Floating-point comparison with tolerance
+    - sqrt: Square root with validation
+  - Implemented polyarb/util/fmt.py with number formatting utilities
+    - format_percent: Format decimals as percentages
+    - format_price: Format price values (for Polymarket [0,1] range)
+    - format_dollar: Format dollar amounts with commas
+    - format_number: General number formatting with optional scientific notation
+    - format_probability: Format probability values
+    - format_bps: Format values as basis points
+    - format_markdown_table: Complete markdown table generation with alignment
+  - Tested all utility functions successfully
