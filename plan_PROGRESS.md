@@ -183,12 +183,12 @@ From the plan analysis, must handle:
   - Section G: One-liner takeaway with key numbers
 
 ### Phase 7: CLI Implementation
-- [ ] 7.1: Implement CLI command structure (polyarb/cli.py)
+- [x] 7.1: Implement CLI command structure (polyarb/cli.py)
   - Main click group with subcommands
   - Setup logging/error handling
   - Environment variable loading (FRED_API_KEY)
 
-- [ ] 7.2: Implement `markets` command
+- [x] 7.2: Implement `markets` command
   - Options: --search, --slug, --limit
   - Call GammaClient.search_markets()
   - Output table: id, title, endDate
@@ -375,6 +375,20 @@ The task order is designed to respect dependencies:
 - More sophisticated vol surface modeling
 
 ## Completed This Iteration
+- Task 7.1: CLI command structure (already complete - marked as done)
+- Task 7.2: Implement `markets` command
+  - Implemented markets listing/search functionality in polyarb/cli.py
+  - Calls GammaClient.search_markets() with query and limit parameters
+  - Displays table with ID, End Date, and Title columns
+  - Truncates long titles for better display
+  - Handles empty results gracefully
+  - Shows count of markets returned
+  - Fixed GammaClient to allow markets without CLOB token IDs in search results
+    - Changed requirement from mandatory to optional for search endpoints
+    - Only get_market() endpoint requires full token mapping
+  - Tested successfully with "BTC" search and without search filter
+
+Previous iteration:
 - Task 6.1: Implement markdown report generator (polyarb/report/markdown_report.py)
 - Task 8.4: Write report tests (tests/test_report_sections.py) - completed alongside task 6.1
   - Created markdown report generator producing comprehensive A-G analysis sections

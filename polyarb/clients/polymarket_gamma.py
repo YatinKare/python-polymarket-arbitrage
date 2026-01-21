@@ -192,8 +192,8 @@ class GammaClient:
                 # Dict format: {outcome: token_id, ...}
                 clob_token_ids = {str(k): str(v) for k, v in clob_token_ids_raw.items()}
 
-            if not clob_token_ids:
-                raise GammaClientError("Missing or invalid CLOB token IDs")
+            # Note: For search results, CLOB token IDs may not always be present
+            # Only the get_market() endpoint is guaranteed to have them
 
             # Parse optional status fields
             active = data.get("active", True)
