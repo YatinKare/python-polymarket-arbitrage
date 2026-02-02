@@ -11,3 +11,9 @@ wheels/
 
 # Env variables
 .env
+
+# some markdown files
+changes.md
+
+## mcp
+.mcp.json

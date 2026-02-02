@@ -61,6 +61,9 @@ def main(ctx: click.Context, verbose: bool):
         logger.debug("Verbose logging enabled")
 
     # Load FRED API key from environment
+    from dotenv import load_dotenv
+    load_dotenv()
+
     ctx.obj.fred_api_key = os.getenv("FRED_API_KEY")
     if ctx.obj.fred_api_key:
         logger.debug("FRED_API_KEY loaded from environment")
