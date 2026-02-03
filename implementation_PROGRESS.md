@@ -116,20 +116,20 @@ Phases 2 and 3 can proceed in parallel after Phase 1. Phase 4 depends on 1-3 bec
   - Added `test_get_price_no_orderbook_error` and `test_get_book_no_orderbook_error` tests
   - All 239 tests pass
 
-- [ ] 3.3: Handle `NoOrderbookError` gracefully in CLI analyze command
+- [x] 3.3: Handle `NoOrderbookError` gracefully in CLI analyze command
   - File: `polyarb/cli.py`
-  - Around lines 479-491 where CLOB prices are fetched, wrap in try/except
-  - On `NoOrderbookError`: print user-friendly message "Market has no active orderbook. Use --yes-price to provide the price manually." and exit cleanly
-  - Test: `uv run polyarb analyze <market-without-orderbook>` — verify friendly error message is shown
+  - Added `NoOrderbookError` to the local import of `polymarket_clob` (line 420)
+  - Moved `clob_client = ClobClient()` before the yes/no price if/else block (fixes task 4.1 scope bug simultaneously)
+  - Wrapped both price-fetch blocks in `try/except NoOrderbookError` → prints friendly message and exits
+  - All 239 tests pass
 
 ### Phase 4: CLI Bug Fix + Expired Market Filter
 
-- [ ] 4.1: Fix `clob_client` scope bug in analyze command
+- [x] 4.1: Fix `clob_client` scope bug in analyze command
   - File: `polyarb/cli.py`
-  - Lines 479-491: `clob_client` is only instantiated inside the `if yes_price is None` block (line 481)
-  - Move `clob_client = ClobClient()` to before the if/else block so it is always available
-  - This fixes the `NameError` when user provides `--yes-price` but not `--no-price`
-  - Test: `uv run polyarb analyze <market-slug> --yes-price 0.5` — verify no NameError when only --yes-price is provided
+  - Moved `clob_client = ClobClient()` out of the `if yes_price is None` block to before the try/except
+  - Fixed as part of task 3.3 — single edit accomplishes both
+  - All 239 tests pass
 
 - [x] 4.2: Add `--include-expired` flag to markets command
   - File: `polyarb/cli.py`
@@ -153,7 +153,7 @@ Phases 2 and 3 can proceed in parallel after Phase 1. Phase 4 depends on 1-3 bec
 
 ## Completed This Iteration
 
-- Task 3.1 + 3.2: Added `NoOrderbookError(ClobClientError)` exception class to `polymarket_clob.py`. Updated 404 handlers in both `get_price()` and `get_book()` to inspect `e.response.text` for "No orderbook exists" and raise `NoOrderbookError` instead of the generic `ClobClientError`. Updated existing 404 test mocks to set `.text` (required for the `in` check). Added two new tests for the `NoOrderbookError` path. All 239 tests pass.
+- Task 3.3 + 4.1: In `cli.py`, added `NoOrderbookError` to the local import. Moved `clob_client = ClobClient()` before the yes/no price fetch block (fixes the scope bug from task 4.1). Wrapped both price-fetch calls in `try/except NoOrderbookError` that prints a friendly error message directing the user to `--yes-price` and exits cleanly. All 239 tests pass.
 
 ## Notes
 

@@ -417,7 +417,7 @@ def analyze(
     # Step 6: Orchestration - fetch all data and run analysis
     try:
         # Import required modules
-        from polyarb.clients.polymarket_clob import ClobClient
+        from polyarb.clients.polymarket_clob import ClobClient, NoOrderbookError
         from polyarb.clients.fred import FredClient
         from polyarb.clients.yfinance_md import YFMarketData
         from polyarb.vol.iv_extract import extract_strike_region_iv
@@ -482,19 +482,23 @@ def analyze(
         yes_token_id = market.clob_token_ids[yes_outcome]
 
         # 6.2: Fetch Polymarket prices from CLOB
-        if yes_price is None:
-            ctx.log(f"Fetching Yes price from CLOB for token {yes_token_id}...")
-            clob_client = ClobClient()
-            yes_price = clob_client.get_yes_price(yes_token_id)
-            ctx.log(f"Yes price: ${yes_price:.4f}")
-        else:
-            ctx.log(f"Using provided Yes price: ${yes_price:.4f}")
+        clob_client = ClobClient()
+        try:
+            if yes_price is None:
+                ctx.log(f"Fetching Yes price from CLOB for token {yes_token_id}...")
+                yes_price = clob_client.get_yes_price(yes_token_id)
+                ctx.log(f"Yes price: ${yes_price:.4f}")
+            else:
+                ctx.log(f"Using provided Yes price: ${yes_price:.4f}")
 
-        if no_price is None and no_outcome is not None:
-            no_token_id = market.clob_token_ids[no_outcome]
-            ctx.log(f"Fetching No price from CLOB for token {no_token_id}...")
-            no_price = clob_client.get_yes_price(no_token_id)
-            ctx.log(f"No price: ${no_price:.4f}")
+            if no_price is None and no_outcome is not None:
+                no_token_id = market.clob_token_ids[no_outcome]
+                ctx.log(f"Fetching No price from CLOB for token {no_token_id}...")
+                no_price = clob_client.get_yes_price(no_token_id)
+                ctx.log(f"No price: ${no_price:.4f}")
+        except NoOrderbookError:
+            click.echo("Error: Market has no active orderbook. Use --yes-price to provide the price manually.", err=True)
+            sys.exit(1)
 
         # 6.3: Fetch yfinance spot price
         ctx.log(f"Fetching spot price for {ticker}...")
