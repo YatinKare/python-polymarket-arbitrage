@@ -85,11 +85,12 @@ Phases 2 and 3 can proceed in parallel after Phase 1. Phase 4 depends on 1-3 bec
   - Each market parsed via `_parse_market()` with same skip-on-error pattern
   - All 237 tests pass
 
-- [ ] 2.2: Route `search_markets()` to use `public_search` when query is provided
+- [x] 2.2: Route `search_markets()` to use `public_search` when query is provided
   - File: `polyarb/clients/polymarket_gamma.py`
-  - In `search_markets()`: when `query` is not None, delegate to `self.public_search(query, limit)` and return its result
-  - When `query` is None (listing without search), keep existing `/markets` endpoint logic
-  - Test: `uv run polyarb markets --query "fed"` — verify results are relevant to query
+  - Added early return at top of `search_markets()`: when `query` is truthy, delegate to `self.public_search(query, limit)` and return
+  - When `query` is None (listing without search), existing `/markets` endpoint logic is unchanged
+  - Updated `test_search_markets_success` mock to return `{"events": [{"markets": [...]}]}` and assert URL is `/public-search` with param `q`
+  - All 237 tests pass
 
 - [ ] 2.3: Add client-side expiry filter to `search_markets()` return
   - File: `polyarb/clients/polymarket_gamma.py`
@@ -149,7 +150,7 @@ Phases 2 and 3 can proceed in parallel after Phase 1. Phase 4 depends on 1-3 bec
 
 ## Completed This Iteration
 
-- Task 2.1: Added `public_search(query, limit)` method to `GammaClient` in `polymarket_gamma.py`. The method hits `GET /public-search?q={query}&limit={limit}`, extracts the nested `events[*].markets` arrays, flattens them, and parses each market via the existing `_parse_market()`. Uses the same try/except skip pattern as `search_markets()` so unparseable markets don't crash the entire listing. All 237 tests pass.
+- Task 2.2: Routed `search_markets()` through `public_search()` when a query string is provided. Added an early-return guard at the top of `search_markets()` that delegates to `self.public_search(query, limit)` when `query` is truthy. The no-query path (plain market listing via `/markets`) is unchanged. Updated the `test_search_markets_success` unit test to mock the `/public-search` response envelope and assert the correct endpoint and params. All 237 tests pass.
 
 ## Notes
 

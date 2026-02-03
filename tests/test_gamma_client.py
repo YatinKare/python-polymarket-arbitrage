@@ -123,10 +123,10 @@ class TestGammaClient:
 
     @patch("httpx.Client")
     def test_search_markets_success(self, mock_client_class, sample_markets_list_response):
-        """Test successful market search."""
-        # Setup mock
+        """Test successful market search routes through /public-search."""
+        # Setup mock — /public-search returns {events: [{markets: [...]}]}
         mock_response = Mock()
-        mock_response.json.return_value = sample_markets_list_response
+        mock_response.json.return_value = {"events": [{"markets": sample_markets_list_response}]}
         mock_response.raise_for_status = Mock()
 
         mock_client = MagicMock()
@@ -146,11 +146,11 @@ class TestGammaClient:
         assert markets[0].id == "0x111"
         assert markets[1].id == "0x222"
 
-        # Verify API call
+        # Verify API call went to /public-search with correct params
         mock_client.get.assert_called_once()
         call_args = mock_client.get.call_args
-        assert call_args[0][0] == "https://gamma-api.polymarket.com/markets"
-        assert call_args[1]["params"]["query"] == "BTC"
+        assert call_args[0][0] == "https://gamma-api.polymarket.com/public-search"
+        assert call_args[1]["params"]["q"] == "BTC"
         assert call_args[1]["params"]["limit"] == 10
 
     @patch("httpx.Client")

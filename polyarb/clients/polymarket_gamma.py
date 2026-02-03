@@ -86,6 +86,11 @@ class GammaClient:
         Raises:
             GammaClientError: If API request fails
         """
+        # Keyword searches must use the /public-search endpoint;
+        # the /markets endpoint ignores the query parameter entirely.
+        if query:
+            return self.public_search(query, limit)
+
         url = f"{self.BASE_URL}/markets"
 
         # Build query parameters
@@ -93,8 +98,6 @@ class GammaClient:
             "limit": limit,
             "offset": offset,
         }
-        if query:
-            params["query"] = query
         if closed:
             params["closed"] = "true"
         if archived:
