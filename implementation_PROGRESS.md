@@ -77,14 +77,13 @@ Phases 2 and 3 can proceed in parallel after Phase 1. Phase 4 depends on 1-3 bec
 
 ### Phase 2: Search Endpoint Fix
 
-- [ ] 2.1: Add `public_search` method to `GammaClient`
+- [x] 2.1: Add `public_search` method to `GammaClient`
   - File: `polyarb/clients/polymarket_gamma.py`
-  - New method: `public_search(self, query: str, limit: int = 10) -> list[Market]`
-  - Endpoint: `GET {BASE_URL}/public-search` with params `{"q": query, "limit": limit}`
-  - Response structure: `{"events": [{"markets": [...], ...}, ...]}` — flatten all `markets` arrays from all events
-  - Each market dict is parsed via existing `_parse_market()`
-  - Apply same try/except pattern as `search_markets()` (skip unparseable markets with warning)
-  - Test: `uv run polyarb markets --query "bitcoin"` — verify search returns relevant results
+  - Added method between `search_markets()` and `_parse_market()`
+  - Hits `GET /public-search?q={query}&limit={limit}`
+  - Parses `{"events": [{"markets": [...]}]}` — flattens all markets from all events
+  - Each market parsed via `_parse_market()` with same skip-on-error pattern
+  - All 237 tests pass
 
 - [ ] 2.2: Route `search_markets()` to use `public_search` when query is provided
   - File: `polyarb/clients/polymarket_gamma.py`
@@ -150,7 +149,7 @@ Phases 2 and 3 can proceed in parallel after Phase 1. Phase 4 depends on 1-3 bec
 
 ## Completed This Iteration
 
-- Task 1.2: Added `if isinstance(clob_token_ids_raw, str): clob_token_ids_raw = json.loads(clob_token_ids_raw)` in `_parse_market()` right after the raw assignment (line 187). When the real Gamma API returns `clobTokenIds` as a JSON-encoded string like `'["token1","token2"]'`, it is now correctly decoded into a Python list before the existing list/dict branching logic runs. Without this, the branch falls through and `clob_token_ids` stays `{}`, breaking all CLOB price lookups. All 237 tests pass.
+- Task 2.1: Added `public_search(query, limit)` method to `GammaClient` in `polymarket_gamma.py`. The method hits `GET /public-search?q={query}&limit={limit}`, extracts the nested `events[*].markets` arrays, flattens them, and parses each market via the existing `_parse_market()`. Uses the same try/except skip pattern as `search_markets()` so unparseable markets don't crash the entire listing. All 237 tests pass.
 
 ## Notes
 

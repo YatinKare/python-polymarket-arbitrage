@@ -133,6 +133,49 @@ class GammaClient:
 
         return markets
 
+    def public_search(self, query: str, limit: int = 10) -> list[Market]:
+        """Search markets using the /public-search endpoint.
+
+        Args:
+            query: Search keyword (e.g. "BTC", "bitcoin")
+            limit: Maximum number of markets to return
+
+        Returns:
+            Flattened list of Market objects from matching events
+
+        Raises:
+            GammaClientError: If API request fails
+        """
+        url = f"{self.BASE_URL}/public-search"
+        params = {"q": query, "limit": limit}
+
+        try:
+            with httpx.Client(timeout=self.timeout) as client:
+                response = client.get(url, params=params)
+                response.raise_for_status()
+                data = response.json()
+        except httpx.HTTPStatusError as e:
+            raise GammaClientError(f"HTTP error in public search: {e}") from e
+        except httpx.RequestError as e:
+            raise GammaClientError(f"Request error in public search: {e}") from e
+        except Exception as e:
+            raise GammaClientError(f"Unexpected error in public search: {e}") from e
+
+        # Response: {"events": [{"markets": [...], ...}, ...]}
+        events = data.get("events", [])
+
+        markets = []
+        for event in events:
+            for market_data in event.get("markets", []):
+                try:
+                    market = self._parse_market(market_data)
+                    markets.append(market)
+                except Exception as e:
+                    print(f"Warning: Failed to parse market in search result: {e}")
+                    continue
+
+        return markets
+
     def _parse_market(self, data: dict) -> Market:
         """Parse market data from API response.
 
