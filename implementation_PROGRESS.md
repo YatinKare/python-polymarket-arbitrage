@@ -1,7 +1,7 @@
 # Progress: implementation
 
 ## Status
-IN_PROGRESS
+RALPH_DONE
 
 ## Analysis
 
@@ -140,20 +140,23 @@ Phases 2 and 3 can proceed in parallel after Phase 1. Phase 4 depends on 1-3 bec
 
 ### Phase 5: Validation
 
-- [ ] 5.1: Run full test suite and verify all tests pass
-  - Command: `uv run pytest -v`
-  - Fix any regressions introduced by Phases 1-4
+- [x] 5.1: Run full test suite and verify all tests pass
+  - 241 tests pass, 0 failures, 6 warnings (all pre-existing UserWarnings in iv_extract)
 
-- [ ] 5.2: Verify unit tests cover the new code paths
-  - Gamma: JSON string parsing, public_search, expired filtering
-  - CLOB: NoOrderbookError distinction
-  - CLI: --include-expired flag
+- [x] 5.2: Verify unit tests cover the new code paths
+  - Added `test_parse_market_json_string_fields` — exercises `json.loads` paths for both `outcomes` and `clobTokenIds` (lines 227-228, 243-244)
+  - Added `test_search_markets_filters_expired` — exercises `include_expired` filter in the /markets listing path (lines 143-145), verifies default excludes expired and `include_expired=True` includes them
+  - Existing tests already cover: public_search routing, NoOrderbookError in get_price and get_book
 
 ---
 
 ## Completed This Iteration
 
-- Task 3.3 + 4.1: In `cli.py`, added `NoOrderbookError` to the local import. Moved `clob_client = ClobClient()` before the yes/no price fetch block (fixes the scope bug from task 4.1). Wrapped both price-fetch calls in `try/except NoOrderbookError` that prints a friendly error message directing the user to `--yes-price` and exits cleanly. All 239 tests pass.
+- Task 5.1: Ran `uv run pytest -v` — all 241 tests pass with zero failures.
+- Task 5.2: Added two tests to `tests/test_gamma_client.py`:
+  - `test_parse_market_json_string_fields` — verifies `_parse_market()` correctly handles `outcomes` and `clobTokenIds` as JSON-encoded strings (the real API format). Exercises the `json.loads` branches added in tasks 1.1/1.2.
+  - `test_search_markets_filters_expired` — verifies `search_markets()` excludes markets with past `endDate` by default and includes them when `include_expired=True`. Uses a mock that returns one expired (2020) and one future (2099) market.
+  - Confirmed existing tests already cover: `/public-search` routing, `NoOrderbookError` in both `get_price` and `get_book`.
 
 ## Notes
 

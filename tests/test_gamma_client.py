@@ -225,6 +225,63 @@ class TestGammaClient:
         market = client._parse_market(data)
         assert market.clob_token_ids == {"Yes": "0xa", "No": "0xb"}
 
+    def test_parse_market_json_string_fields(self):
+        """Test parsing market when outcomes and clobTokenIds are JSON strings (real API format)."""
+        client = GammaClient()
+        data = {
+            "id": "0x789",
+            "title": "JSON String Test",
+            "endDate": "2030-06-15T12:00:00Z",
+            "outcomes": '["Yes", "No"]',
+            "clobTokenIds": '["0xaaa", "0xbbb"]',
+        }
+
+        market = client._parse_market(data)
+        assert market.outcomes == ["Yes", "No"]
+        assert market.clob_token_ids == {"Yes": "0xaaa", "No": "0xbbb"}
+
+    @patch("httpx.Client")
+    def test_search_markets_filters_expired(self, mock_client_class):
+        """Test that search_markets excludes expired markets by default and includes them when asked."""
+        past_market = {
+            "id": "0xold",
+            "title": "Expired Market",
+            "endDate": "2020-01-01T00:00:00Z",
+            "outcomes": ["Yes", "No"],
+            "clobTokenIds": ["0x1", "0x2"],
+        }
+        future_market = {
+            "id": "0xnew",
+            "title": "Active Market",
+            "endDate": "2099-12-31T23:59:59Z",
+            "outcomes": ["Yes", "No"],
+            "clobTokenIds": ["0x3", "0x4"],
+        }
+
+        mock_response = Mock()
+        mock_response.json.return_value = [past_market, future_market]
+        mock_response.raise_for_status = Mock()
+
+        mock_client = MagicMock()
+        mock_client.get.return_value = mock_response
+        mock_client.__enter__.return_value = mock_client
+        mock_client.__exit__.return_value = False
+        mock_client_class.return_value = mock_client
+
+        client = GammaClient()
+
+        # Default: expired market filtered out
+        markets = client.search_markets()
+        assert len(markets) == 1
+        assert markets[0].id == "0xnew"
+
+        # include_expired=True: both returned
+        markets = client.search_markets(include_expired=True)
+        assert len(markets) == 2
+        ids = {m.id for m in markets}
+        assert "0xold" in ids
+        assert "0xnew" in ids
+
     def test_parse_market_alternate_field_names(self):
         """Test parsing market with alternate API field names."""
         client = GammaClient()
