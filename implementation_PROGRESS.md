@@ -103,19 +103,18 @@ Phases 2 and 3 can proceed in parallel after Phase 1. Phase 4 depends on 1-3 bec
 
 ### Phase 3: CLOB 404 Error Handling
 
-- [ ] 3.1: Add `NoOrderbookError` exception class to CLOB client
+- [x] 3.1: Add `NoOrderbookError` exception class to CLOB client
   - File: `polyarb/clients/polymarket_clob.py`
-  - Add new class `NoOrderbookError(ClobClientError)` after `ClobClientError` definition (around line 12)
-  - No other changes to the class hierarchy
-  - Test: `uv run python -c "from polyarb.clients.polymarket_clob import NoOrderbookError; print('OK')"` — verify import works
+  - Added `class NoOrderbookError(ClobClientError)` after `ClobClientError` definition
+  - All 239 tests pass
 
-- [ ] 3.2: Parse 404 response body in `get_price()` and `get_book()` to distinguish error types
+- [x] 3.2: Parse 404 response body in `get_price()` and `get_book()` to distinguish error types
   - File: `polyarb/clients/polymarket_clob.py`
-  - In both `get_price()` (lines 59-61) and `get_book()` (lines 90-92) 404 handlers:
-    - Read `e.response.text` or `e.response.json()` safely
-    - If body contains "No orderbook exists", raise `NoOrderbookError(...)` instead of generic `ClobClientError`
-    - Otherwise keep the existing `ClobClientError("Token ... not found")`
-  - Test: Use a known market without orderbook, or verify via `uv run polyarb analyze <market-slug>` that error is raised correctly
+  - In both `get_price()` and `get_book()` 404 handlers: check `e.response.text` for "No orderbook exists"
+  - If present, raise `NoOrderbookError`; otherwise keep existing `ClobClientError("Token ... not found")`
+  - Updated existing 404 test mocks to set `.text = "Not Found"` (required because Mock doesn't support `in` operator)
+  - Added `test_get_price_no_orderbook_error` and `test_get_book_no_orderbook_error` tests
+  - All 239 tests pass
 
 - [ ] 3.3: Handle `NoOrderbookError` gracefully in CLI analyze command
   - File: `polyarb/cli.py`
@@ -154,7 +153,7 @@ Phases 2 and 3 can proceed in parallel after Phase 1. Phase 4 depends on 1-3 bec
 
 ## Completed This Iteration
 
-- Task 2.3 + 4.2: Added client-side expiry filter to `search_markets()`. New `include_expired: bool = False` parameter filters out markets with `end_date` in the past. Filter is applied in both the `public_search` query path and the `/markets` listing path. Used `datetime.now(tz=timezone.utc)` to match the tz-aware datetimes produced by `parse_datetime`. Added `--include-expired` CLI flag to the `markets` command and wired it through to `search_markets()`. Updated test fixture dates to 2030 so existing tests remain valid under the new default filter. All 237 tests pass.
+- Task 3.1 + 3.2: Added `NoOrderbookError(ClobClientError)` exception class to `polymarket_clob.py`. Updated 404 handlers in both `get_price()` and `get_book()` to inspect `e.response.text` for "No orderbook exists" and raise `NoOrderbookError` instead of the generic `ClobClientError`. Updated existing 404 test mocks to set `.text` (required for the `in` check). Added two new tests for the `NoOrderbookError` path. All 239 tests pass.
 
 ## Notes
 
