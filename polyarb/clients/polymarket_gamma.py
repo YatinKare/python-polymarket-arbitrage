@@ -1,5 +1,7 @@
 """Polymarket Gamma API client for market data."""
 
+import json
+
 import httpx
 from datetime import datetime
 from typing import Optional
@@ -166,6 +168,8 @@ class GammaClient:
 
             # Parse outcomes
             outcomes_data = data.get("outcomes") or []
+            if isinstance(outcomes_data, str):
+                outcomes_data = json.loads(outcomes_data)
             if not outcomes_data:
                 raise GammaClientError("Missing outcomes in response")
 
