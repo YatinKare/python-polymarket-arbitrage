@@ -70,11 +70,10 @@ Phases 2 and 3 can proceed in parallel after Phase 1. Phase 4 depends on 1-3 bec
   - Added `if isinstance(outcomes_data, str): outcomes_data = json.loads(outcomes_data)` before the emptiness check
   - All 237 tests pass
 
-- [ ] 1.2: Parse `clobTokenIds` when it is a string
+- [x] 1.2: Parse `clobTokenIds` when it is a string
   - File: `polyarb/clients/polymarket_gamma.py`
-  - After line 174-178 (where `clob_token_ids_raw` is assigned), add: if `isinstance(clob_token_ids_raw, str)`, do `clob_token_ids_raw = json.loads(clob_token_ids_raw)`
-  - The existing list/dict branch logic at lines 183-191 then handles it correctly
-  - Test: `uv run polyarb markets --limit 1` — verify clobTokenIds parse correctly and market has valid token IDs
+  - Added `if isinstance(clob_token_ids_raw, str): clob_token_ids_raw = json.loads(clob_token_ids_raw)` after the raw assignment, before the list/dict branch
+  - All 237 tests pass
 
 ### Phase 2: Search Endpoint Fix
 
@@ -151,7 +150,7 @@ Phases 2 and 3 can proceed in parallel after Phase 1. Phase 4 depends on 1-3 bec
 
 ## Completed This Iteration
 
-- Task 1.1: Added `import json` to `polymarket_gamma.py` and inserted a string-type check (`isinstance(outcomes_data, str)` → `json.loads(...)`) before the outcomes list comprehension. This ensures that when the real Gamma API returns `outcomes` as a JSON-encoded string, it is correctly decoded into a Python list before iteration. All 237 existing tests pass.
+- Task 1.2: Added `if isinstance(clob_token_ids_raw, str): clob_token_ids_raw = json.loads(clob_token_ids_raw)` in `_parse_market()` right after the raw assignment (line 187). When the real Gamma API returns `clobTokenIds` as a JSON-encoded string like `'["token1","token2"]'`, it is now correctly decoded into a Python list before the existing list/dict branching logic runs. Without this, the branch falls through and `clob_token_ids` stays `{}`, breaking all CLOB price lookups. All 237 tests pass.
 
 ## Notes
 

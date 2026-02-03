@@ -184,6 +184,9 @@ class GammaClient:
                 or []
             )
 
+            if isinstance(clob_token_ids_raw, str):
+                clob_token_ids_raw = json.loads(clob_token_ids_raw)
+
             # Build outcome -> token_id mapping
             clob_token_ids = {}
             if isinstance(clob_token_ids_raw, list):
