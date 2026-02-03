@@ -1,7 +1,9 @@
 """Polymarket Gamma API client for market data."""
 
+import json
+
 import httpx
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from polyarb.models import Market
@@ -68,6 +70,7 @@ class GammaClient:
         offset: int = 0,
         closed: bool = False,
         archived: bool = False,
+        include_expired: bool = False,
     ) -> list[Market]:
         """Search markets by query string.
 
@@ -77,6 +80,7 @@ class GammaClient:
             offset: Number of markets to skip (for pagination)
             closed: Include closed markets
             archived: Include archived markets
+            include_expired: Include markets whose end_date is in the past
 
         Returns:
             List of Market objects matching search criteria
@@ -84,17 +88,28 @@ class GammaClient:
         Raises:
             GammaClientError: If API request fails
         """
+        # Keyword searches must use the /public-search endpoint;
+        # the /markets endpoint ignores the query parameter entirely.
+        if query:
+            # Fetch more markets than requested since we filter expired ones client-side
+            # Request extra to account for expired markets that will be filtered out
+            fetch_limit = limit * 5 if not include_expired else limit
+            markets = self.public_search(query, fetch_limit)
+            if not include_expired:
+                now = datetime.now(tz=timezone.utc)
+                markets = [m for m in markets if m.end_date > now]
+            # Apply limit after filtering
+            return markets[:limit]
+
         url = f"{self.BASE_URL}/markets"
 
         # Build query parameters
+        # By default, request non-closed markets to get active/tradable markets
         params = {
             "limit": limit,
             "offset": offset,
+            "closed": "true" if closed else "false",
         }
-        if query:
-            params["query"] = query
-        if closed:
-            params["closed"] = "true"
         if archived:
             params["archived"] = "true"
 
@@ -129,7 +144,58 @@ class GammaClient:
                 print(f"Warning: Failed to parse market: {e}")
                 continue
 
+        if not include_expired:
+            now = datetime.now(tz=timezone.utc)
+            markets = [m for m in markets if m.end_date > now]
+
         return markets
+
+    def public_search(self, query: str, limit: int = 10) -> list[Market]:
+        """Search markets using the /public-search endpoint.
+
+        Args:
+            query: Search keyword (e.g. "BTC", "bitcoin")
+            limit: Maximum number of markets to return
+
+        Returns:
+            Flattened list of Market objects from matching events
+
+        Raises:
+            GammaClientError: If API request fails
+        """
+        url = f"{self.BASE_URL}/public-search"
+        params = {"q": query, "limit": limit}
+
+        try:
+            with httpx.Client(timeout=self.timeout) as client:
+                response = client.get(url, params=params)
+                response.raise_for_status()
+                data = response.json()
+        except httpx.HTTPStatusError as e:
+            raise GammaClientError(f"HTTP error in public search: {e}") from e
+        except httpx.RequestError as e:
+            raise GammaClientError(f"Request error in public search: {e}") from e
+        except Exception as e:
+            raise GammaClientError(f"Unexpected error in public search: {e}") from e
+
+        # Response: {"events": [{"markets": [...], ...}, ...]}
+        # Note: The API limit applies to events, not total markets.
+        # Each event can contain multiple markets, so we collect all markets
+        # from all returned events and then apply the limit client-side.
+        events = data.get("events", [])
+
+        markets = []
+        for event in events:
+            for market_data in event.get("markets", []):
+                try:
+                    market = self._parse_market(market_data)
+                    markets.append(market)
+                except Exception as e:
+                    print(f"Warning: Failed to parse market in search result: {e}")
+                    continue
+
+        # Apply limit client-side to the flattened list of markets
+        return markets[:limit]
 
     def _parse_market(self, data: dict) -> Market:
         """Parse market data from API response.
@@ -166,6 +232,8 @@ class GammaClient:
 
             # Parse outcomes
             outcomes_data = data.get("outcomes") or []
+            if isinstance(outcomes_data, str):
+                outcomes_data = json.loads(outcomes_data)
             if not outcomes_data:
                 raise GammaClientError("Missing outcomes in response")
 
@@ -179,6 +247,9 @@ class GammaClient:
                 or data.get("tokens")
                 or []
             )
+
+            if isinstance(clob_token_ids_raw, str):
+                clob_token_ids_raw = json.loads(clob_token_ids_raw)
 
             # Build outcome -> token_id mapping
             clob_token_ids = {}

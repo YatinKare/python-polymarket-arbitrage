@@ -12,6 +12,11 @@ class ClobClientError(Exception):
     pass
 
 
+class NoOrderbookError(ClobClientError):
+    """Error raised when a token has no active orderbook."""
+    pass
+
+
 class ClobClient:
     """Client for Polymarket CLOB (Central Limit Order Book) API.
 
@@ -58,6 +63,8 @@ class ClobClient:
                 data = response.json()
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
+                if "No orderbook exists" in e.response.text:
+                    raise NoOrderbookError(f"No active orderbook for token {token_id}") from e
                 raise ClobClientError(f"Token {token_id} not found") from e
             raise ClobClientError(f"HTTP error fetching price for {token_id}: {e}") from e
         except httpx.RequestError as e:
@@ -89,6 +96,8 @@ class ClobClient:
                 data = response.json()
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
+                if "No orderbook exists" in e.response.text:
+                    raise NoOrderbookError(f"No active orderbook for token {token_id}") from e
                 raise ClobClientError(f"Token {token_id} not found") from e
             raise ClobClientError(f"HTTP error fetching book for {token_id}: {e}") from e
         except httpx.RequestError as e:

@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 from datetime import datetime
 import httpx
 
-from polyarb.clients.polymarket_clob import ClobClient, ClobClientError
+from polyarb.clients.polymarket_clob import ClobClient, ClobClientError, NoOrderbookError
 from polyarb.models import TokenPrice, OrderBook, OrderBookLevel, Side
 
 
@@ -100,6 +100,7 @@ def test_get_price_404_error(mock_httpx_client):
     """Test handling of 404 error (token not found)."""
     mock_response = Mock()
     mock_response.status_code = 404
+    mock_response.text = "Not Found"
     mock_httpx_client.get.side_effect = httpx.HTTPStatusError(
         "Not Found", request=Mock(), response=mock_response
     )
@@ -287,6 +288,7 @@ def test_get_book_404_error(mock_httpx_client):
     """Test handling of 404 error for order book."""
     mock_response = Mock()
     mock_response.status_code = 404
+    mock_response.text = "Not Found"
     mock_httpx_client.get.side_effect = httpx.HTTPStatusError(
         "Not Found", request=Mock(), response=mock_response
     )
@@ -294,6 +296,34 @@ def test_get_book_404_error(mock_httpx_client):
     client = ClobClient()
     with pytest.raises(ClobClientError, match="not found"):
         client.get_book("nonexistent")
+
+
+def test_get_price_no_orderbook_error(mock_httpx_client):
+    """Test that NoOrderbookError is raised when API returns 'No orderbook exists'."""
+    mock_response = Mock()
+    mock_response.status_code = 404
+    mock_response.text = '{"error":"No orderbook exists for the requested token id"}'
+    mock_httpx_client.get.side_effect = httpx.HTTPStatusError(
+        "Not Found", request=Mock(), response=mock_response
+    )
+
+    client = ClobClient()
+    with pytest.raises(NoOrderbookError, match="No active orderbook"):
+        client.get_price("inactive_token", Side.BUY)
+
+
+def test_get_book_no_orderbook_error(mock_httpx_client):
+    """Test that NoOrderbookError is raised for get_book when no orderbook exists."""
+    mock_response = Mock()
+    mock_response.status_code = 404
+    mock_response.text = '{"error":"No orderbook exists for the requested token id"}'
+    mock_httpx_client.get.side_effect = httpx.HTTPStatusError(
+        "Not Found", request=Mock(), response=mock_response
+    )
+
+    client = ClobClient()
+    with pytest.raises(NoOrderbookError, match="No active orderbook"):
+        client.get_book("inactive_token")
 
 
 def test_custom_timeout():
