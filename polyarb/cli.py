@@ -113,6 +113,8 @@ def markets(ctx: PolyarbContext, search: Optional[str], slug: Optional[str], lim
 
         if not markets_list:
             click.echo("No markets found.")
+            if not include_expired:
+                click.echo("Tip: Use --include-expired to see expired markets.")
             return
 
         # Output table header

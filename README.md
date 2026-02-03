@@ -55,7 +55,7 @@ Search for Polymarket markets by keyword:
 
 ```bash
 # Search for Bitcoin-related markets
-uv run polyarb markets --search "BTC"
+uv run polyarb markets --search "bitcoin"
 
 # Search for election markets
 uv run polyarb markets --search "Trump" --limit 5
@@ -156,7 +156,7 @@ Common FRED series IDs:
 Enable debug logging for any command:
 
 ```bash
-uv run polyarb -v markets --search "BTC"
+uv run polyarb -v markets --search "bitcoin"
 uv run polyarb --verbose analyze 12345 --ticker BTC-USD --event-type touch --level 80000
 ```
 

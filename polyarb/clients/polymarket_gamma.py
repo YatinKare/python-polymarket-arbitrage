@@ -91,21 +91,25 @@ class GammaClient:
         # Keyword searches must use the /public-search endpoint;
         # the /markets endpoint ignores the query parameter entirely.
         if query:
-            markets = self.public_search(query, limit)
+            # Fetch more markets than requested since we filter expired ones client-side
+            # Request extra to account for expired markets that will be filtered out
+            fetch_limit = limit * 5 if not include_expired else limit
+            markets = self.public_search(query, fetch_limit)
             if not include_expired:
                 now = datetime.now(tz=timezone.utc)
                 markets = [m for m in markets if m.end_date > now]
-            return markets
+            # Apply limit after filtering
+            return markets[:limit]
 
         url = f"{self.BASE_URL}/markets"
 
         # Build query parameters
+        # By default, request non-closed markets to get active/tradable markets
         params = {
             "limit": limit,
             "offset": offset,
+            "closed": "true" if closed else "false",
         }
-        if closed:
-            params["closed"] = "true"
         if archived:
             params["archived"] = "true"
 
@@ -175,6 +179,9 @@ class GammaClient:
             raise GammaClientError(f"Unexpected error in public search: {e}") from e
 
         # Response: {"events": [{"markets": [...], ...}, ...]}
+        # Note: The API limit applies to events, not total markets.
+        # Each event can contain multiple markets, so we collect all markets
+        # from all returned events and then apply the limit client-side.
         events = data.get("events", [])
 
         markets = []
@@ -187,7 +194,8 @@ class GammaClient:
                     print(f"Warning: Failed to parse market in search result: {e}")
                     continue
 
-        return markets
+        # Apply limit client-side to the flattened list of markets
+        return markets[:limit]
 
     def _parse_market(self, data: dict) -> Market:
         """Parse market data from API response.
