@@ -3,7 +3,7 @@
 import json
 
 import httpx
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from polyarb.models import Market
@@ -70,6 +70,7 @@ class GammaClient:
         offset: int = 0,
         closed: bool = False,
         archived: bool = False,
+        include_expired: bool = False,
     ) -> list[Market]:
         """Search markets by query string.
 
@@ -79,6 +80,7 @@ class GammaClient:
             offset: Number of markets to skip (for pagination)
             closed: Include closed markets
             archived: Include archived markets
+            include_expired: Include markets whose end_date is in the past
 
         Returns:
             List of Market objects matching search criteria
@@ -89,7 +91,11 @@ class GammaClient:
         # Keyword searches must use the /public-search endpoint;
         # the /markets endpoint ignores the query parameter entirely.
         if query:
-            return self.public_search(query, limit)
+            markets = self.public_search(query, limit)
+            if not include_expired:
+                now = datetime.now(tz=timezone.utc)
+                markets = [m for m in markets if m.end_date > now]
+            return markets
 
         url = f"{self.BASE_URL}/markets"
 
@@ -133,6 +139,10 @@ class GammaClient:
                 # Log warning but continue processing other markets
                 print(f"Warning: Failed to parse market: {e}")
                 continue
+
+        if not include_expired:
+            now = datetime.now(tz=timezone.utc)
+            markets = [m for m in markets if m.end_date > now]
 
         return markets
 

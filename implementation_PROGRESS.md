@@ -92,11 +92,14 @@ Phases 2 and 3 can proceed in parallel after Phase 1. Phase 4 depends on 1-3 bec
   - Updated `test_search_markets_success` mock to return `{"events": [{"markets": [...]}]}` and assert URL is `/public-search` with param `q`
   - All 237 tests pass
 
-- [ ] 2.3: Add client-side expiry filter to `search_markets()` return
+- [x] 2.3: Add client-side expiry filter to `search_markets()` return
   - File: `polyarb/clients/polymarket_gamma.py`
-  - After collecting markets list, filter out any where `market.end_date < datetime.now()` (unless a flag says otherwise)
-  - Add a `include_expired: bool = False` parameter to `search_markets()` signature
-  - Test: `uv run polyarb markets --query "2024"` — verify expired markets are filtered out by default
+  - Added `include_expired: bool = False` parameter to `search_markets()` signature
+  - Filter applied in both code paths (public_search query path and /markets listing path)
+  - Used `datetime.now(tz=timezone.utc)` for comparison since `parse_datetime` returns tz-aware datetimes
+  - Added `timezone` to the `from datetime import` line
+  - Updated `sample_markets_list_response` fixture dates to 2030 (future) so existing tests exercise default filter correctly
+  - All 237 tests pass
 
 ### Phase 3: CLOB 404 Error Handling
 
@@ -129,11 +132,12 @@ Phases 2 and 3 can proceed in parallel after Phase 1. Phase 4 depends on 1-3 bec
   - This fixes the `NameError` when user provides `--yes-price` but not `--no-price`
   - Test: `uv run polyarb analyze <market-slug> --yes-price 0.5` — verify no NameError when only --yes-price is provided
 
-- [ ] 4.2: Add `--include-expired` flag to markets command
+- [x] 4.2: Add `--include-expired` flag to markets command
   - File: `polyarb/cli.py`
-  - Add `@click.option("--include-expired", is_flag=True, default=False, help="Include expired markets in listing.")` to the `markets` command
-  - Pass the flag through to `client.search_markets(..., include_expired=include_expired)`
-  - Test: `uv run polyarb markets --query "2024" --include-expired` — verify expired markets now appear in results
+  - Added `@click.option("--include-expired", ...)` to the `markets` command decorator stack
+  - Added `include_expired: bool` parameter to the `markets()` function signature
+  - Passed flag through to `client.search_markets(..., include_expired=include_expired)`
+  - Done as part of task 2.3 (the CLI flag is the consumer of the filter)
 
 ### Phase 5: Validation
 
@@ -150,7 +154,7 @@ Phases 2 and 3 can proceed in parallel after Phase 1. Phase 4 depends on 1-3 bec
 
 ## Completed This Iteration
 
-- Task 2.2: Routed `search_markets()` through `public_search()` when a query string is provided. Added an early-return guard at the top of `search_markets()` that delegates to `self.public_search(query, limit)` when `query` is truthy. The no-query path (plain market listing via `/markets`) is unchanged. Updated the `test_search_markets_success` unit test to mock the `/public-search` response envelope and assert the correct endpoint and params. All 237 tests pass.
+- Task 2.3 + 4.2: Added client-side expiry filter to `search_markets()`. New `include_expired: bool = False` parameter filters out markets with `end_date` in the past. Filter is applied in both the `public_search` query path and the `/markets` listing path. Used `datetime.now(tz=timezone.utc)` to match the tz-aware datetimes produced by `parse_datetime`. Added `--include-expired` CLI flag to the `markets` command and wired it through to `search_markets()`. Updated test fixture dates to 2030 so existing tests remain valid under the new default filter. All 237 tests pass.
 
 ## Notes
 

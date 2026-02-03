@@ -88,8 +88,14 @@ def main(ctx: click.Context, verbose: bool):
     default=10,
     help="Maximum number of markets to return.",
 )
+@click.option(
+    "--include-expired",
+    is_flag=True,
+    default=False,
+    help="Include expired markets in listing.",
+)
 @pass_context
-def markets(ctx: PolyarbContext, search: Optional[str], slug: Optional[str], limit: int):
+def markets(ctx: PolyarbContext, search: Optional[str], slug: Optional[str], limit: int, include_expired: bool):
     """
     List and search Polymarket markets.
 
@@ -103,7 +109,7 @@ def markets(ctx: PolyarbContext, search: Optional[str], slug: Optional[str], lim
 
     try:
         client = GammaClient()
-        markets_list = client.search_markets(query=search, limit=limit)
+        markets_list = client.search_markets(query=search, limit=limit, include_expired=include_expired)
 
         if not markets_list:
             click.echo("No markets found.")
